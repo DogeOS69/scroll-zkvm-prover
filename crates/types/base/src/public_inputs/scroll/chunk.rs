@@ -68,6 +68,9 @@ pub struct ChunkInfo {
     pub post_state_root: B256,
     /// The withdrawals root after applying the chunk.
     pub withdraw_root: B256,
+    /// The next message index after applying the chunk.
+    #[serde(default)]
+    pub next_message_index: u64,
     /// Digest of L1 message txs force included in the chunk.
     /// It is a legacy field and can be omitted in new defination
     #[serde(default)]
@@ -104,6 +107,7 @@ impl std::fmt::Display for ChunkInfo {
                     .field("prev_state_root", &self.0.prev_state_root)
                     .field("post_state_root", &self.0.post_state_root)
                     .field("withdraw_root", &self.0.withdraw_root)
+                    .field("next_message_index", &self.0.next_message_index)
                     .field("data_hash", &self.0.data_hash)
                     .field("tx_data_digest", &self.0.tx_data_digest)
                     .field("prev_msg_queue_hash", &self.0.prev_msg_queue_hash)
@@ -220,11 +224,42 @@ impl ChunkInfo {
             .collect()
     }
 
-    /// Public inputs encoded for a given chunk (galileo or da-codec@v9) is defined as
+    /// Public inputs encoded for a given chunk (galileo or da-codec@v10) is defined as
     ///
-    /// The same as galileo.
+    /// concat(
+    ///     version ||
+    ///     chain id ||
+    ///     prev state root ||
+    ///     post state root ||
+    ///     withdraw root ||
+    ///     next message index ||
+    ///     tx data digest ||
+    ///     prev msg queue hash ||
+    ///     post msg queue hash ||
+    ///     initial block number ||
+    ///     block_ctx for block_ctx in block_ctxs
+    /// )
     pub fn pi_galileo_v2(&self, version: Version) -> Vec<u8> {
-        self.pi_galileo(version)
+        std::iter::empty()
+            .chain(&[version.as_version_byte()])
+            .chain(&self.chain_id.to_be_bytes())
+            .chain(self.prev_state_root.as_slice())
+            .chain(self.post_state_root.as_slice())
+            .chain(self.withdraw_root.as_slice())
+            .chain(&self.next_message_index.to_be_bytes())
+            .chain(self.tx_data_digest.as_slice())
+            .chain(self.prev_msg_queue_hash.as_slice())
+            .chain(self.post_msg_queue_hash.as_slice())
+            .chain(&self.initial_block_number.to_be_bytes())
+            .chain(
+                self.block_ctxs
+                    .iter()
+                    .flat_map(|block_ctx| block_ctx.to_bytes())
+                    .collect::<Vec<u8>>()
+                    .as_slice(),
+            )
+            .copied()
+            .collect()
     }
 
     /// Public inputs encoded for a given chunk for L3 validium @ v1:

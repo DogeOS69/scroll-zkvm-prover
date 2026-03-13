@@ -20,6 +20,9 @@ pub struct BatchInfo {
     pub chain_id: u64,
     /// The withdraw root of the last block in the last chunk in the batch.
     pub withdraw_root: B256,
+    /// The next message index of the last block in the last chunk in the batch.
+    #[serde(default)]
+    pub next_message_index: u64,
     /// The L1 msg queue hash at the end of the previous batch.
     pub prev_msg_queue_hash: B256,
     /// The L1 msg queue hash at the end of the current batch.
@@ -112,11 +115,34 @@ impl BatchInfo {
             .collect()
     }
 
-    /// Public inputs encoded for a batch (galileo or da-codec@v9) is defined as
+    /// Public inputs encoded for a batch (galileo or da-codec@v10) is defined as
     ///
-    /// Same as galileo.
+    /// concat(
+    ///     version ||
+    ///     parent state root ||
+    ///     parent batch hash ||
+    ///     state root ||
+    ///     batch hash ||
+    ///     chain id ||
+    ///     withdraw root ||
+    ///     next message index ||
+    ///     prev msg queue hash ||
+    ///     post msg queue hash
+    /// )
     pub fn pi_galileo_v2(&self, version: Version) -> Vec<u8> {
-        self.pi_galileo(version)
+        std::iter::empty()
+            .chain(&[version.as_version_byte()])
+            .chain(self.parent_state_root.as_slice())
+            .chain(self.parent_batch_hash.as_slice())
+            .chain(self.state_root.as_slice())
+            .chain(self.batch_hash.as_slice())
+            .chain(self.chain_id.to_be_bytes().as_slice())
+            .chain(self.withdraw_root.as_slice())
+            .chain(self.next_message_index.to_be_bytes().as_slice())
+            .chain(self.prev_msg_queue_hash.as_slice())
+            .chain(self.post_msg_queue_hash.as_slice())
+            .copied()
+            .collect()
     }
 
     /// Public inputs encoded for a L3 validium @ v1.
