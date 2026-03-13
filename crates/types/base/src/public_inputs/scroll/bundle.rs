@@ -96,6 +96,8 @@ impl BundleInfo {
     }
 
     pub fn pi_galileo_v2(&self) -> Vec<u8> {
+        // GalileoV2 keeps the bundle PI layout unchanged; next_message_index is committed only
+        // at the chunk and batch layers in the DogeOS overlay.
         self.pi_euclidv2()
     }
 

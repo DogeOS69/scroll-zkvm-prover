@@ -69,6 +69,9 @@ pub struct ChunkInfo {
     /// The withdrawals root after applying the chunk.
     pub withdraw_root: B256,
     /// The next message index after applying the chunk.
+    ///
+    /// Transitional compatibility for pre-overlay JSON assets.
+    /// TODO(dogeos): remove `default` once all Scroll@v10 assets include this field explicitly.
     #[serde(default)]
     pub next_message_index: u64,
     /// Digest of L1 message txs force included in the chunk.
@@ -224,7 +227,7 @@ impl ChunkInfo {
             .collect()
     }
 
-    /// Public inputs encoded for a given chunk (galileo or da-codec@v10) is defined as
+    /// Public inputs encoded for a given chunk for Scroll@v10 (GalileoV2) is defined as
     ///
     /// concat(
     ///     version ||
@@ -280,6 +283,7 @@ impl ChunkInfo {
     ///     encryption key
     /// )
     pub fn pi_validium(&self, version: Version) -> Vec<u8> {
+        // Validium keeps the upstream PI layout and intentionally excludes next_message_index.
         std::iter::empty()
             .chain(&[version.as_version_byte()])
             .chain(&self.chain_id.to_be_bytes())
@@ -337,6 +341,11 @@ impl MultiVersionPublicInputs for ChunkInfo {
         assert_eq!(self.chain_id, prev_pi.chain_id);
         assert_eq!(self.prev_state_root, prev_pi.post_state_root);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
+
+        // Scroll@v10 commits next_message_index into the PI, so it must not regress.
+        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
+            assert!(self.next_message_index >= prev_pi.next_message_index);
+        }
 
         // message queue hash is used only after euclidv2 (da-codec@v7)
         if version.fork == ForkName::EuclidV1 {

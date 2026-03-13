@@ -21,6 +21,9 @@ pub struct BatchInfo {
     /// The withdraw root of the last block in the last chunk in the batch.
     pub withdraw_root: B256,
     /// The next message index of the last block in the last chunk in the batch.
+    ///
+    /// Transitional compatibility for pre-overlay JSON assets.
+    /// TODO(dogeos): remove `default` once all Scroll@v10 assets include this field explicitly.
     #[serde(default)]
     pub next_message_index: u64,
     /// The L1 msg queue hash at the end of the previous batch.
@@ -115,7 +118,7 @@ impl BatchInfo {
             .collect()
     }
 
-    /// Public inputs encoded for a batch (galileo or da-codec@v10) is defined as
+    /// Public inputs encoded for a batch for Scroll@v10 (GalileoV2) is defined as
     ///
     /// concat(
     ///     version ||
@@ -160,6 +163,7 @@ impl BatchInfo {
     ///     encryption key
     /// )
     fn pi_validium(&self, version: Version) -> Vec<u8> {
+        // Validium keeps the upstream PI layout and intentionally excludes next_message_index.
         std::iter::empty()
             .chain(&[version.as_version_byte()])
             .chain(self.parent_state_root.as_slice())
@@ -204,6 +208,11 @@ impl MultiVersionPublicInputs for BatchInfo {
         assert_eq!(self.parent_state_root, prev_pi.state_root);
         assert_eq!(self.parent_batch_hash, prev_pi.batch_hash);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
+
+        // Scroll@v10 commits next_message_index into the PI, so it must not regress.
+        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
+            assert!(self.next_message_index >= prev_pi.next_message_index);
+        }
 
         if version.fork == ForkName::EuclidV1 {
             assert_eq!(self.prev_msg_queue_hash, B256::ZERO);

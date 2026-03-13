@@ -11,8 +11,7 @@ This overlay threads Scroll's `nextMessageIndex` from
 - Extend `ChunkInfo` and `BatchInfo` with `next_message_index`.
 - Add `#[serde(default)]` so older JSON assets still deserialize during the
   transition.
-- Append the value only in `galileo_v2` / `da-codec@v10` public input
-  encodings.
+- Append the value only in `galileo_v2` / `Scroll@v10` public input encodings.
 - Leave older PI versions and bundle behavior unchanged.
 
 ## Why this stays maintainable
