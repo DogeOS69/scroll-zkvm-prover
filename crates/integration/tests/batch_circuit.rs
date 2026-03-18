@@ -1,3 +1,4 @@
+use sbv_primitives::B256;
 use scroll_zkvm_integration::{
     ProverTester,
     testers::{
@@ -5,11 +6,10 @@ use scroll_zkvm_integration::{
         chunk::{ChunkProverTester, create_canonical_tasks, preset_chunk_multiple},
         load_local_task,
     },
-    utils::{build_batch_witnesses, metadata_from_batch_witnesses},
     testing_version,
+    utils::{build_batch_witnesses, metadata_from_batch_witnesses},
 };
 use scroll_zkvm_prover::task::ProvingTask;
-use sbv_primitives::B256;
 use scroll_zkvm_types::public_inputs::Version;
 use std::str::FromStr;
 
@@ -121,10 +121,7 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
         ),
         ForkName::GalileoV2 => (
             Version::galileo_v2(),
-            vec![
-                32144474..=32144475,
-                32144476..=32144476,
-            ],
+            vec![32144474..=32144474, 32144475..=32144476],
         ),
     };
     let outcome_2 = create_canonical_tasks(version, block_range.into_iter())?;

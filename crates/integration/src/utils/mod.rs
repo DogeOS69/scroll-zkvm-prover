@@ -433,6 +433,7 @@ fn test_build_and_parse_batch_task() -> eyre::Result<()> {
             ..Default::default()
         },
         ForkName::GalileoV2 => ChunkTaskGenerator {
+            version: scroll_zkvm_types::public_inputs::Version::galileo_v2(),
             block_range: (32144474..=32144476).collect(),
             ..Default::default()
         },

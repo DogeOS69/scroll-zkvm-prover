@@ -4,6 +4,9 @@ Source range:
 - `32144474`
 - `32144475`
 - `32144476`
+- `32144477`
+- `32144478`
+- `32144479`
 
 Dumped from `https://scroll.api.onfinality.io/public` with DogeOS SBV commit `9a6c90f`,
 using `sbv-cli dump` plus the authenticated `L2MessageQueue` proof augmentation.

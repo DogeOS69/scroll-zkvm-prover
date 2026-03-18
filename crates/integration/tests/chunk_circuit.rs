@@ -2,8 +2,10 @@ use alloy_primitives::{B256, b256};
 use eyre::Ok;
 use sbv_primitives::types::consensus::TxL1Message;
 use scroll_zkvm_integration::testers::PATH_TESTDATA;
-use scroll_zkvm_integration::testers::chunk::{read_block_witness, read_block_witness_from_testdata};
 use scroll_zkvm_integration::testers::chunk::{exec_chunk, execute_multi};
+use scroll_zkvm_integration::testers::chunk::{
+    read_block_witness, read_block_witness_from_testdata,
+};
 use scroll_zkvm_integration::utils::get_rayon_threads;
 use scroll_zkvm_integration::{
     ProverTester, prove_verify,

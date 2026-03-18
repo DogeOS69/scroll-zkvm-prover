@@ -203,7 +203,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::EuclidV2 => (Version::euclid_v2(), 1u64..=4u64),
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
-        ForkName::GalileoV2 => (Version::galileo_v2(), 32144474..=32144476),
+        ForkName::GalileoV2 => (Version::galileo_v2(), 32144474..=32144479),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -376,7 +376,7 @@ mod tests {
         let single = preset_chunk();
         assert_eq!(
             single.block_range,
-            (32144474u64..=32144476).collect::<Vec<u64>>(),
+            (32144474u64..=32144479).collect::<Vec<u64>>(),
         );
         let multiple = preset_chunk_multiple();
         assert_eq!(
@@ -400,20 +400,20 @@ mod tests {
         );
         std::env::set_var(
             "BLOCK_RANGE",
-            "32144474..=32144474,32144475..=32144475,32144476..=32144476",
+            "32144474..=32144475,32144476..=32144477,32144478..=32144479",
         );
         let multiple = preset_chunk_multiple();
         assert_eq!(
             multiple[0].block_range,
-            (32144474u64..=32144474u64).collect::<Vec<u64>>()
+            (32144474u64..=32144475u64).collect::<Vec<u64>>()
         );
         assert_eq!(
             multiple[1].block_range,
-            (32144475u64..=32144475u64).collect::<Vec<u64>>()
+            (32144476u64..=32144477u64).collect::<Vec<u64>>()
         );
         assert_eq!(
             multiple[2].block_range,
-            (32144476u64..=32144476u64).collect::<Vec<u64>>()
+            (32144478u64..=32144479u64).collect::<Vec<u64>>()
         );
     }
 }
