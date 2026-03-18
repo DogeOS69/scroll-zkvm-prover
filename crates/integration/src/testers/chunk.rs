@@ -203,7 +203,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::EuclidV2 => (Version::euclid_v2(), 1u64..=4u64),
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
-        ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
+        ForkName::GalileoV2 => (Version::galileo_v2(), 32144474..=32144476),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -292,9 +292,9 @@ pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
         ),
         ForkName::GalileoV2 => (
             vec![
-                20239240..=20239240,
-                20239241..=20239241,
-                20239242..=20239242,
+                32144474..=32144474,
+                32144475..=32144475,
+                32144476..=32144476,
             ],
             Version::galileo_v2(),
         ),
@@ -376,20 +376,20 @@ mod tests {
         let single = preset_chunk();
         assert_eq!(
             single.block_range,
-            (20239240u64..=20239245).collect::<Vec<u64>>(),
+            (32144474u64..=32144476).collect::<Vec<u64>>(),
         );
         let multiple = preset_chunk_multiple();
         assert_eq!(
             multiple[0].block_range,
-            (20239240..=20239240).collect::<Vec<u64>>(),
+            (32144474..=32144474).collect::<Vec<u64>>(),
         );
         assert_eq!(
             multiple[1].block_range,
-            (20239241..=20239241).collect::<Vec<u64>>(),
+            (32144475..=32144475).collect::<Vec<u64>>(),
         );
         assert_eq!(
             multiple[2].block_range,
-            (20239242..=20239242).collect::<Vec<u64>>(),
+            (32144476..=32144476).collect::<Vec<u64>>(),
         );
 
         // After setting env var.
@@ -400,20 +400,20 @@ mod tests {
         );
         std::env::set_var(
             "BLOCK_RANGE",
-            "20239240..=20239241,20239242..=20239243,20239244..=20239245",
+            "32144474..=32144474,32144475..=32144475,32144476..=32144476",
         );
         let multiple = preset_chunk_multiple();
         assert_eq!(
             multiple[0].block_range,
-            (20239240u64..=20239241u64).collect::<Vec<u64>>()
+            (32144474u64..=32144474u64).collect::<Vec<u64>>()
         );
         assert_eq!(
             multiple[1].block_range,
-            (20239242u64..=20239243u64).collect::<Vec<u64>>()
+            (32144475u64..=32144475u64).collect::<Vec<u64>>()
         );
         assert_eq!(
             multiple[2].block_range,
-            (20239244u64..=20239245u64).collect::<Vec<u64>>()
+            (32144476u64..=32144476u64).collect::<Vec<u64>>()
         );
     }
 }

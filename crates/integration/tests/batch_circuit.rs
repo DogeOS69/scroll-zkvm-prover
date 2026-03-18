@@ -5,10 +5,13 @@ use scroll_zkvm_integration::{
         chunk::{ChunkProverTester, create_canonical_tasks, preset_chunk_multiple},
         load_local_task,
     },
+    utils::{build_batch_witnesses, metadata_from_batch_witnesses},
     testing_version,
 };
 use scroll_zkvm_prover::task::ProvingTask;
+use sbv_primitives::B256;
 use scroll_zkvm_types::public_inputs::Version;
+use std::str::FromStr;
 
 #[ignore = "need local stuff"]
 #[test]
@@ -118,11 +121,9 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
         ),
         ForkName::GalileoV2 => (
             Version::galileo_v2(),
-            // TODO(rohit): update after adding testdata.
             vec![
-                20239240..=20239241,
-                20239242..=20239243,
-                20239244..=20239245,
+                32144474..=32144475,
+                32144476..=32144476,
             ],
         ),
     };
@@ -136,6 +137,25 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
         task_1.get_or_build_witness()?.blob_bytes,
         task_2.get_or_build_witness()?.blob_bytes,
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_galileov2_batch_metadata() -> eyre::Result<()> {
+    let chunks = preset_chunk_multiple()
+        .into_iter()
+        .map(|mut task| task.get_or_build_witness())
+        .collect::<eyre::Result<Vec<_>>>()?;
+
+    let witness = build_batch_witnesses(&chunks, &[0u8; 64], Default::default())?;
+    let info = metadata_from_batch_witnesses(&witness)?;
+
+    assert_eq!(
+        info.withdraw_root,
+        B256::from_str("0x9d42c00e8305f065d4e8df4d073cd9424986b0dcc63becf39b718d9f61f99179")?,
+    );
+    assert_eq!(info.next_message_index, 221555);
 
     Ok(())
 }

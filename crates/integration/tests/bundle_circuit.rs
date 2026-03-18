@@ -4,17 +4,19 @@ use scroll_zkvm_integration::{
     testers::{
         batch::{BatchProverTester, preset_batch_multiple, preset_batch_validium},
         bundle::{BundleProverTester, BundleTaskGenerator},
-        chunk::ChunkProverTester,
+        chunk::{ChunkProverTester, preset_chunk_multiple},
         load_local_task,
     },
     testing_version, testing_version_validium,
-    utils::metadata_from_bundle_witnesses,
+    utils::{build_batch_witnesses, metadata_from_batch_witnesses, metadata_from_bundle_witnesses},
 };
 use scroll_zkvm_prover::{Prover, ProverConfig};
 use scroll_zkvm_types::version::Version;
 use scroll_zkvm_types::{
     proof::OpenVmEvmProof,
     public_inputs::{ForkName, MultiVersionPublicInputs, PublicInputs},
+    scroll::bundle::BundleWitness,
+    types_agg::{AggregationInput, ProgramCommitment},
 };
 use std::str::FromStr;
 
@@ -220,6 +222,49 @@ fn test_execute_validium() -> eyre::Result<()> {
             "pi inconsistent at index {i}: expected={expected}, observed={observed:?}"
         );
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_galileov2_bundle_pi_hash_metadata_only() -> eyre::Result<()> {
+    let mut chunks = preset_chunk_multiple();
+    let chunk_witnesses = chunks
+        .iter_mut()
+        .map(|task| task.get_or_build_witness())
+        .collect::<eyre::Result<Vec<_>>>()?;
+
+    let batch_1 = build_batch_witnesses(&chunk_witnesses[..1], &[0u8; 64], Default::default())?;
+    let batch_2 = build_batch_witnesses(
+        &chunk_witnesses[1..],
+        &[0u8; 64],
+        (&batch_1.reference_header).into(),
+    )?;
+
+    let batch_infos = vec![
+        metadata_from_batch_witnesses(&batch_1)?,
+        metadata_from_batch_witnesses(&batch_2)?,
+    ];
+    let batch_proofs = vec![
+        AggregationInput {
+            public_values: vec![0; 32],
+            commitment: ProgramCommitment::default(),
+        };
+        batch_infos.len()
+    ];
+    let witness = BundleWitness {
+        version: testing_version().as_version_byte(),
+        batch_infos,
+        batch_proofs,
+        fork_name: testing_version().fork,
+    };
+    let metadata = metadata_from_bundle_witnesses(&witness)?;
+    let pi_hash = metadata.pi_hash_by_version(testing_version());
+
+    assert_eq!(
+        pi_hash,
+        B256::from_str("0x83b50688e028b5e3f7a70d6168b450c3d7195e5bc8f791d9642988d09ea5ba3a")?,
+    );
 
     Ok(())
 }

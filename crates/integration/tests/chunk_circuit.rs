@@ -1,8 +1,8 @@
-use alloy_primitives::B256;
+use alloy_primitives::{B256, b256};
 use eyre::Ok;
 use sbv_primitives::types::consensus::TxL1Message;
 use scroll_zkvm_integration::testers::PATH_TESTDATA;
-use scroll_zkvm_integration::testers::chunk::read_block_witness;
+use scroll_zkvm_integration::testers::chunk::{read_block_witness, read_block_witness_from_testdata};
 use scroll_zkvm_integration::testers::chunk::{exec_chunk, execute_multi};
 use scroll_zkvm_integration::utils::get_rayon_threads;
 use scroll_zkvm_integration::{
@@ -164,6 +164,26 @@ fn test_execute_multi() -> eyre::Result<()> {
         total_cycle,
         total_cycle as f64 / total_gas as f64,
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_galileov2_queue_outputs() -> eyre::Result<()> {
+    let witness = ChunkWitness::new_scroll(
+        Version::galileo_v2().as_version_byte(),
+        &[read_block_witness_from_testdata(32144474)?],
+        B256::repeat_byte(1u8),
+        scroll_zkvm_types::public_inputs::ForkName::GalileoV2,
+    );
+
+    let info = metadata_from_chunk_witnesses(witness)?;
+
+    assert_eq!(
+        info.withdraw_root,
+        b256!("9d42c00e8305f065d4e8df4d073cd9424986b0dcc63becf39b718d9f61f99179"),
+    );
+    assert_eq!(info.next_message_index, 221555);
 
     Ok(())
 }

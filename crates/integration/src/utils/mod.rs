@@ -433,7 +433,7 @@ fn test_build_and_parse_batch_task() -> eyre::Result<()> {
             ..Default::default()
         },
         ForkName::GalileoV2 => ChunkTaskGenerator {
-            block_range: (20239240..=20239245).collect(),
+            block_range: (32144474..=32144476).collect(),
             ..Default::default()
         },
     }
