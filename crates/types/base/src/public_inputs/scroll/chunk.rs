@@ -69,10 +69,6 @@ pub struct ChunkInfo {
     /// The withdrawals root after applying the chunk.
     pub withdraw_root: B256,
     /// The next message index after applying the chunk.
-    ///
-    /// Transitional compatibility for pre-overlay JSON assets.
-    /// TODO(dogeos): remove `default` once all Scroll@v10 assets include this field explicitly.
-    #[serde(default)]
     pub next_message_index: u64,
     /// Digest of L1 message txs force included in the chunk.
     /// It is a legacy field and can be omitted in new defination
@@ -344,7 +340,12 @@ impl MultiVersionPublicInputs for ChunkInfo {
 
         // Scroll@v10 commits next_message_index into the PI, so it must not regress.
         if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
-            assert!(self.next_message_index >= prev_pi.next_message_index);
+            assert!(
+                self.next_message_index >= prev_pi.next_message_index,
+                "next_message_index must not regress: current={}, previous={}",
+                self.next_message_index,
+                prev_pi.next_message_index
+            );
         }
 
         // message queue hash is used only after euclidv2 (da-codec@v7)
@@ -362,5 +363,106 @@ impl MultiVersionPublicInputs for ChunkInfo {
             assert!(self.encryption_key.is_some());
             assert_eq!(self.encryption_key, prev_pi.encryption_key);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BlockContextV2, ChunkInfo};
+    use crate::{
+        public_inputs::{MultiVersionPublicInputs, Version},
+        version::Domain,
+    };
+    use alloy_primitives::{B256, U256};
+
+    fn sample_chunk_info(next_message_index: u64) -> ChunkInfo {
+        ChunkInfo {
+            chain_id: 534352,
+            prev_state_root: B256::repeat_byte(0x11),
+            post_state_root: B256::repeat_byte(0x22),
+            withdraw_root: B256::repeat_byte(0x33),
+            next_message_index,
+            data_hash: B256::repeat_byte(0x44),
+            tx_data_digest: B256::repeat_byte(0x55),
+            prev_msg_queue_hash: B256::repeat_byte(0x66),
+            post_msg_queue_hash: B256::repeat_byte(0x77),
+            tx_data_length: 123,
+            initial_block_number: 456,
+            block_ctxs: vec![BlockContextV2 {
+                timestamp: 789,
+                base_fee: U256::from(321u64),
+                gas_limit: 654,
+                num_txs: 3,
+                num_l1_msgs: 1,
+            }],
+            prev_blockhash: B256::repeat_byte(0x88),
+            post_blockhash: B256::repeat_byte(0x99),
+            encryption_key: None,
+        }
+    }
+
+    fn next_contiguous_chunk(prev: &ChunkInfo, next_message_index: u64) -> ChunkInfo {
+        ChunkInfo {
+            prev_state_root: prev.post_state_root,
+            prev_msg_queue_hash: prev.post_msg_queue_hash,
+            ..sample_chunk_info(next_message_index)
+        }
+    }
+
+    fn panic_message(err: Box<dyn std::any::Any + Send>) -> String {
+        match err.downcast::<String>() {
+            Ok(msg) => *msg,
+            Err(err) => match err.downcast::<&'static str>() {
+                Ok(msg) => (*msg).to_string(),
+                Err(_) => panic!("unexpected non-string panic payload"),
+            },
+        }
+    }
+
+    #[test]
+    fn chunk_json_requires_next_message_index() {
+        let mut value = serde_json::to_value(sample_chunk_info(42)).unwrap();
+        value
+            .as_object_mut()
+            .expect("chunk info object")
+            .remove("next_message_index");
+
+        let err = serde_json::from_value::<ChunkInfo>(value)
+            .expect_err("chunk info must require next_message_index");
+        assert!(err.to_string().contains("next_message_index"));
+    }
+
+    #[test]
+    fn galileov2_chunk_pi_layout_commits_next_message_index() {
+        let pi = sample_chunk_info(0x0102_0304_0506_0708).pi_galileo_v2(Version::galileo_v2());
+
+        assert_eq!(pi.len(), 269);
+        assert_eq!(pi[0], Version::galileo_v2().as_version_byte());
+        assert_eq!(&pi[105..113], &0x0102_0304_0506_0708u64.to_be_bytes());
+        assert_eq!(&pi[113..145], B256::repeat_byte(0x55).as_slice());
+    }
+
+    #[test]
+    fn galileov2_chunk_validate_reports_regression_values() {
+        let version = Version::galileo_v2();
+        let prev = sample_chunk_info(22);
+        let current = next_contiguous_chunk(&prev, 21);
+
+        let err = std::panic::catch_unwind(|| current.validate(&prev, version))
+            .expect_err("v10 validation must reject regressions");
+
+        let message = panic_message(err);
+        assert!(message.contains("current=21"));
+        assert!(message.contains("previous=22"));
+    }
+
+    #[test]
+    fn pre_v10_chunk_validate_ignores_next_message_index_regression() {
+        let version = Version::galileo();
+        assert_eq!(version.domain, Domain::Scroll);
+
+        let prev = sample_chunk_info(22);
+        let current = next_contiguous_chunk(&prev, 21);
+        current.validate(&prev, version);
     }
 }

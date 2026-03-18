@@ -21,10 +21,6 @@ pub struct BatchInfo {
     /// The withdraw root of the last block in the last chunk in the batch.
     pub withdraw_root: B256,
     /// The next message index of the last block in the last chunk in the batch.
-    ///
-    /// Transitional compatibility for pre-overlay JSON assets.
-    /// TODO(dogeos): remove `default` once all Scroll@v10 assets include this field explicitly.
-    #[serde(default)]
     pub next_message_index: u64,
     /// The L1 msg queue hash at the end of the previous batch.
     pub prev_msg_queue_hash: B256,
@@ -211,7 +207,12 @@ impl MultiVersionPublicInputs for BatchInfo {
 
         // Scroll@v10 commits next_message_index into the PI, so it must not regress.
         if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
-            assert!(self.next_message_index >= prev_pi.next_message_index);
+            assert!(
+                self.next_message_index >= prev_pi.next_message_index,
+                "next_message_index must not regress: current={}, previous={}",
+                self.next_message_index,
+                prev_pi.next_message_index
+            );
         }
 
         if version.fork == ForkName::EuclidV1 {
@@ -225,5 +226,96 @@ impl MultiVersionPublicInputs for BatchInfo {
             assert!(self.encryption_key.is_some());
             assert_eq!(self.encryption_key, prev_pi.encryption_key);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BatchInfo;
+    use crate::{
+        public_inputs::{MultiVersionPublicInputs, Version},
+        version::Domain,
+    };
+    use alloy_primitives::B256;
+
+    fn sample_batch_info(next_message_index: u64) -> BatchInfo {
+        BatchInfo {
+            parent_state_root: B256::repeat_byte(0x11),
+            parent_batch_hash: B256::repeat_byte(0x22),
+            state_root: B256::repeat_byte(0x33),
+            batch_hash: B256::repeat_byte(0x44),
+            chain_id: 534352,
+            withdraw_root: B256::repeat_byte(0x55),
+            next_message_index,
+            prev_msg_queue_hash: B256::repeat_byte(0x66),
+            post_msg_queue_hash: B256::repeat_byte(0x77),
+            encryption_key: None,
+        }
+    }
+
+    fn next_contiguous_batch(prev: &BatchInfo, next_message_index: u64) -> BatchInfo {
+        BatchInfo {
+            parent_state_root: prev.state_root,
+            parent_batch_hash: prev.batch_hash,
+            prev_msg_queue_hash: prev.post_msg_queue_hash,
+            ..sample_batch_info(next_message_index)
+        }
+    }
+
+    fn panic_message(err: Box<dyn std::any::Any + Send>) -> String {
+        match err.downcast::<String>() {
+            Ok(msg) => *msg,
+            Err(err) => match err.downcast::<&'static str>() {
+                Ok(msg) => (*msg).to_string(),
+                Err(_) => panic!("unexpected non-string panic payload"),
+            },
+        }
+    }
+
+    #[test]
+    fn batch_json_requires_next_message_index() {
+        let mut value = serde_json::to_value(sample_batch_info(42)).unwrap();
+        value
+            .as_object_mut()
+            .expect("batch info object")
+            .remove("next_message_index");
+
+        let err = serde_json::from_value::<BatchInfo>(value)
+            .expect_err("batch info must require next_message_index");
+        assert!(err.to_string().contains("next_message_index"));
+    }
+
+    #[test]
+    fn galileov2_batch_pi_layout_commits_next_message_index() {
+        let pi = sample_batch_info(0x0102_0304_0506_0708).pi_galileo_v2(Version::galileo_v2());
+
+        assert_eq!(pi.len(), 241);
+        assert_eq!(pi[0], Version::galileo_v2().as_version_byte());
+        assert_eq!(&pi[169..177], &0x0102_0304_0506_0708u64.to_be_bytes());
+        assert_eq!(&pi[177..209], B256::repeat_byte(0x66).as_slice());
+    }
+
+    #[test]
+    fn galileov2_batch_validate_reports_regression_values() {
+        let version = Version::galileo_v2();
+        let prev = sample_batch_info(22);
+        let current = next_contiguous_batch(&prev, 21);
+
+        let err = std::panic::catch_unwind(|| current.validate(&prev, version))
+            .expect_err("v10 validation must reject regressions");
+
+        let message = panic_message(err);
+        assert!(message.contains("current=21"));
+        assert!(message.contains("previous=22"));
+    }
+
+    #[test]
+    fn pre_v10_batch_validate_ignores_next_message_index_regression() {
+        let version = Version::galileo();
+        assert_eq!(version.domain, Domain::Scroll);
+
+        let prev = sample_batch_info(22);
+        let current = next_contiguous_batch(&prev, 21);
+        current.validate(&prev, version);
     }
 }

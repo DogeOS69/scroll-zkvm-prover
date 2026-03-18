@@ -9,8 +9,7 @@ This overlay threads Scroll's `nextMessageIndex` from
 
 - Patch all five `sbv-*` crates to the DogeOS SBV fork at one immutable `rev`.
 - Extend `ChunkInfo` and `BatchInfo` with `next_message_index`.
-- Add `#[serde(default)]` so older JSON assets still deserialize during the
-  transition.
+- Require `next_message_index` in serialized chunk and batch metadata.
 - Append the value only in `galileo_v2` / `Scroll@v10` public input encodings.
 - Leave older PI versions and bundle behavior unchanged.
 
