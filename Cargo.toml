@@ -145,11 +145,11 @@ scroll-zkvm-prover = { path = "crates/prover" }
 scroll-zkvm-verifier = { path = "crates/verifier" }
 
 [patch."https://github.com/scroll-tech/stateless-block-verifier"]
-sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
-sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
-sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
-sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
-sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b2af3136e5e5e2df8e2f86f1e6e6e19f7e9dde0c" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b2af3136e5e5e2df8e2f86f1e6e6e19f7e9dde0c" }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b2af3136e5e5e2df8e2f86f1e6e6e19f7e9dde0c" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b2af3136e5e5e2df8e2f86f1e6e6e19f7e9dde0c" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b2af3136e5e5e2df8e2f86f1e6e6e19f7e9dde0c" }
 
 [patch.crates-io]
 revm = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
