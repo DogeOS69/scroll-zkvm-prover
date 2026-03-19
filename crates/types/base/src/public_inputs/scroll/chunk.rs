@@ -342,9 +342,7 @@ impl MultiVersionPublicInputs for ChunkInfo {
         if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
             assert!(
                 self.next_message_index >= prev_pi.next_message_index,
-                "next_message_index must not regress: current={}, previous={}",
-                self.next_message_index,
-                prev_pi.next_message_index
+                "next_message_index must not regress"
             );
         }
 
@@ -443,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    fn galileov2_chunk_validate_reports_regression_values() {
+    fn galileov2_chunk_validate_reports_regression() {
         let version = Version::galileo_v2();
         let prev = sample_chunk_info(22);
         let current = next_contiguous_chunk(&prev, 21);
@@ -452,8 +450,7 @@ mod tests {
             .expect_err("v10 validation must reject regressions");
 
         let message = panic_message(err);
-        assert!(message.contains("current=21"));
-        assert!(message.contains("previous=22"));
+        assert!(message.contains("next_message_index must not regress"));
     }
 
     #[test]
