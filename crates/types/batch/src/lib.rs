@@ -14,7 +14,7 @@ pub use payload::{
 };
 
 pub mod blob_consistency;
-mod builder;
+pub mod builder;
 
 mod witness;
 pub use witness::{BatchWitness, Bytes48, PointEvalWitness, build_point_eval_witness};

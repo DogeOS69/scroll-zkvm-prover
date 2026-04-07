@@ -24,7 +24,7 @@ pub struct GenericBatchInfoBuilderV7<P> {
 
 /// Verify the `blob_bytes` is consistent with the `blob_versioned_hash` by
 /// evaluating the blob polynomial at the challenge derived from `challenge_digest`.
-fn verify_blob_versioned_hash(
+pub fn verify_blob_versioned_hash(
     blob_bytes: &[u8],
     blob_versioned_hash: B256,
     challenge_digest: B256,
