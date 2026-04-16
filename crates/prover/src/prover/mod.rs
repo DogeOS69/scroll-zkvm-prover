@@ -3,20 +3,19 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-#[cfg(not(feature = "cuda"))]
-use openvm_native_circuit::NativeCpuBuilder as NativeBuilder;
-#[cfg(feature = "cuda")]
-use openvm_native_circuit::NativeGpuBuilder as NativeBuilder;
-
 use openvm_circuit::arch::instructions::exe::VmExe;
-use openvm_sdk::{DefaultStarkEngine, config::SdkVmBuilder};
+use openvm_sdk::DefaultStarkEngine;
 use openvm_sdk::{
     F, Sdk, StdIn,
-    config::{AppConfig, SdkVmConfig},
+    config::{AggregationSystemParams, AppConfig},
     prover::StarkProver,
 };
-use scroll_zkvm_types::{proof::OpenVmEvmProof, types_agg::ProgramCommitment, utils::serialize_vk};
-use scroll_zkvm_verifier::verifier::{AGG_STARK_PROVING_KEY, UniversalVerifier};
+use openvm_sdk_config::{SdkVmBuilder, SdkVmConfig};
+use scroll_zkvm_types::{
+    proof::OpenVmEvmProof, types_agg::ProgramCommitment, utils::serialize_vk,
+    zkvm::program_commitment_from_f_digests,
+};
+use scroll_zkvm_verifier::verifier::UniversalVerifier;
 use tracing::instrument;
 
 type SdkAppConfig = AppConfig<SdkVmConfig>;
@@ -42,7 +41,7 @@ pub struct Prover {
     /// Lazily initialized SDK
     sdk: OnceLock<Sdk>,
     /// Lazily initialized stark prover
-    prover: OnceLock<StarkProver<DefaultStarkEngine, SdkVmBuilder, NativeBuilder>>,
+    prover: OnceLock<StarkProver<DefaultStarkEngine, SdkVmBuilder>>,
 }
 
 /// Configure the [`Prover`].
@@ -56,17 +55,25 @@ pub struct ProverConfig {
     pub segment_len: Option<usize>,
 }
 
-const DEFAULT_SEGMENT_SIZE: usize = (1 << 22) - 1000;
+const DEFAULT_SEGMENT_SIZE: usize = 1 << 22;
 
 impl Prover {
     /// Setup the [`Prover`] given paths to the application's exe and proving key.
     #[instrument("Prover::setup")]
     pub fn setup(config: ProverConfig, name: Option<&str>) -> Result<Self, Error> {
         let mut app_config = read_app_config(&config.path_app_config)?;
-        let segment_len = config.segment_len.unwrap_or(DEFAULT_SEGMENT_SIZE);
-        let segmentation_limits = &mut app_config.app_vm_config.system.config.segmentation_limits;
-        segmentation_limits.max_trace_height = segment_len as u32;
-        segmentation_limits.max_cells = 1_200_000_000_usize; // For 24G vram
+        let segment_len = config
+            .segment_len
+            .unwrap_or(DEFAULT_SEGMENT_SIZE)
+            .next_power_of_two();
+        let segmentation_limits = &mut app_config
+            .app_vm_config
+            .system
+            .config
+            .segmentation_config
+            .limits;
+        segmentation_limits.set_max_trace_height(segment_len as u32);
+        segmentation_limits.set_max_memory(1_200_000_000_usize); // For 24G vram
 
         let app_exe = read_app_exe(&config.path_app_exe)?;
         Ok(Self {
@@ -85,22 +92,22 @@ impl Prover {
         self.prover = OnceLock::new();
     }
 
-    /// Get or initialize the SDK lazily
+    /// Get or initialize the SDK lazily.
+    ///
+    /// Uses `OnceLock::get_or_init` so that concurrent `&self` callers don't both spend time
+    /// on a full `Sdk::new` only to throw one result away.
     fn get_sdk(&self) -> Result<&Sdk, Error> {
-        self.sdk.get_or_try_init(|| {
+        Ok(self.sdk.get_or_init(|| {
             tracing::info!("Lazy initializing SDK...");
-            let sdk = Sdk::new(self.app_config.clone()).expect("sdk init failed");
-
-            // 45s for first time
-            let sdk = sdk.with_agg_pk(AGG_STARK_PROVING_KEY.clone());
-            Ok(sdk)
-        })
+            Sdk::new(self.app_config.clone(), AggregationSystemParams::default())
+                .expect("sdk init failed")
+        }))
     }
 
     /// Get or initialize the prover lazily
     fn get_prover_mut(
         &mut self,
-    ) -> Result<&mut StarkProver<DefaultStarkEngine, SdkVmBuilder, NativeBuilder>, Error> {
+    ) -> Result<&mut StarkProver<DefaultStarkEngine, SdkVmBuilder>, Error> {
         if self.prover.get().is_none() {
             tracing::info!("Lazy initializing prover...");
             let sdk = self.get_sdk()?;
@@ -113,10 +120,10 @@ impl Prover {
     /// Pick up loaded app commit, to distinguish from which circuit the proof comes
     pub fn get_app_commitment(&mut self) -> ProgramCommitment {
         let prover = self.get_prover_mut().expect("Failed to initialize prover");
-        let commits = prover.app_commit();
-        let exe = commits.app_exe_commit.to_u32_digest();
-        let vm = commits.app_vm_commit.to_u32_digest();
-        ProgramCommitment { exe, vm }
+        program_commitment_from_f_digests(
+            prover.app_prover.app_exe_commit(),
+            prover.app_vm_commit(),
+        )
     }
 
     /// Pick up loaded app commit as "vk" in proof, to distinguish from which circuit the proof comes
@@ -143,12 +150,13 @@ impl Prover {
         tracing::debug!(name: "generate_root_verifier_input", task_id);
 
         let stdin = task.build_guest_input();
+        let def_inputs = task.build_deferral_inputs();
 
         // Generate a new proof.
         let proof = if !with_snark {
-            self.gen_proof_stark(stdin)?.into()
+            self.gen_proof_stark(stdin, &def_inputs)?.into()
         } else {
-            EvmProof::from(self.gen_proof_snark(stdin)?).into()
+            EvmProof::from(self.gen_proof_snark(stdin, &def_inputs)?).into()
         };
 
         tracing::info!(
@@ -194,7 +202,11 @@ impl Prover {
     /// Generate a [root proof][root_proof].
     ///
     /// [root_proof][openvm_sdk::verifier::root::types::RootVmVerifierInput]
-    pub fn gen_proof_stark(&mut self, stdin: StdIn) -> Result<StarkProof, Error> {
+    pub fn gen_proof_stark(
+        &mut self,
+        stdin: StdIn,
+        def_inputs: &[openvm_sdk::DeferralInput],
+    ) -> Result<StarkProof, Error> {
         // Here we always do an execution of the guest program to get the cycle count.
         // and do precheck before proving like ensure PI != 0
         let t = std::time::Instant::now();
@@ -203,7 +215,10 @@ impl Prover {
 
         let t = std::time::Instant::now();
         let prover = self.get_prover_mut()?;
-        let proof = prover.prove(stdin);
+        let (proof, _) = prover
+            .prove(stdin, def_inputs)
+            .map_err(|e| Error::GenProof(e.to_string()))?;
+        let baseline = prover.generate_baseline();
         let proving_time_mills = t.elapsed().as_millis() as u64;
         let proving_time_s = proving_time_mills as f32 / 1000.0f32;
         let prove_speed = (total_cycles as f32 / 1_000_000.0f32) / proving_time_s; // MHz
@@ -213,26 +228,18 @@ impl Prover {
             prove_speed,
             proving_time_s
         );
-        let proof = proof.map_err(|e| Error::GenProof(e.to_string()))?;
         let stat = StarkProofStat {
             total_cycles,
             proving_time_mills,
             execution_time_mills,
         };
-        let proof = StarkProof {
-            proofs: vec![proof.inner],
-            public_values: proof.user_public_values,
-            //exe_commitment: comm.exe,
-            //vm_commitment: comm.vm,
-            stat,
-        };
+        let mut proof = StarkProof::from_vm_stark_proof(proof, Some(baseline.into()))
+            .map_err(|e| Error::GenProof(e.to_string()))?;
+        proof.stat = stat;
         tracing::info!("verifing stark proof");
-        UniversalVerifier::verify_stark_proof_with_vk(
-            &AGG_STARK_PROVING_KEY.get_agg_vk(),
-            &proof,
-            &self.get_app_vk(),
-        )
-        .map_err(|e| Error::VerifyProof(e.to_string()))?;
+        let agg_vk = self.get_sdk()?.agg_vk();
+        UniversalVerifier::verify_stark_proof_with_vk(agg_vk.as_ref(), &proof, &self.get_app_vk())
+            .map_err(|e| Error::VerifyProof(e.to_string()))?;
         tracing::info!("verifing stark proof done");
         Ok(proof)
     }
@@ -240,12 +247,16 @@ impl Prover {
     /// Generate an [evm proof][evm_proof].
     ///
     /// [evm_proof][openvm_native_recursion::halo2::EvmProof]
-    pub fn gen_proof_snark(&mut self, stdin: StdIn) -> Result<OpenVmEvmProof, Error> {
+    pub fn gen_proof_snark(
+        &mut self,
+        stdin: StdIn,
+        def_inputs: &[openvm_sdk::DeferralInput],
+    ) -> Result<OpenVmEvmProof, Error> {
         self.execute_and_check(&stdin)?;
 
         let sdk = self.get_sdk()?;
         let evm_proof = sdk
-            .prove_evm(self.app_exe.clone(), stdin)
+            .prove_evm(self.app_exe.clone(), stdin, def_inputs)
             .map_err(|e| Error::GenProof(format!("{}", e)))?;
 
         Ok(evm_proof)

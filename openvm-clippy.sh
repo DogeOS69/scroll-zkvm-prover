@@ -3,7 +3,8 @@
 # Alas, the openvm CLI does not offer `clippy` as a subcommand,
 # so we have to use `cargo` directly.  The options are copy-and-pasted from
 # `openvm`'s `build` command.
-clippycmd="cargo +nightly-2025-08-18 clippy \
+toolchain="${OPENVM_RUST_TOOLCHAIN:-nightly-2026-01-18}"
+clippycmd="cargo +${toolchain} clippy \
   --target riscv32im-risc0-zkvm-elf \
   -Z build-std=alloc,core,proc_macro,panic_abort,std \
   -Z build-std-features=compiler-builtins-mem \

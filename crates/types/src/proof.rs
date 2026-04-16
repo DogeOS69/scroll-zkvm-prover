@@ -1,11 +1,13 @@
 use crate::utils::{as_base64, vec_as_base64};
-use openvm_native_recursion::halo2::RawEvmProof;
 use openvm_sdk::SC;
-use openvm_sdk::codec::Decode;
+use openvm_sdk::openvm_circuit::system::memory::merkle::public_values::UserPublicValuesProof;
+use openvm_sdk::types::VerificationBaselineJson;
 use openvm_stark_sdk::{
-    openvm_stark_backend::{p3_field::PrimeField32, proof::Proof},
+    openvm_stark_backend::{codec::Decode, p3_field::PrimeField32, proof::Proof},
     p3_baby_bear::BabyBear,
 };
+use openvm_static_verifier::{Fr, keygen::RawEvmProof};
+use openvm_verify_stark_host::{VmStarkProof, vk::VerificationBaseline};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::Cursor;
@@ -58,8 +60,12 @@ pub struct StarkProof {
     /// The public values for the proof.
     #[serde(with = "as_base64")]
     pub public_values: Vec<BabyBear>,
-    //pub exe_commitment: [u32; 8],
-    //pub vm_commitment: [u32; 8],
+    /// Full proof payload preserved for recursive aggregation flows.
+    #[serde(default)]
+    pub versioned_proof: Option<openvm_sdk::types::VersionedVmStarkProof>,
+    /// Verification baseline paired with `versioned_proof` for host-side deferral helpers.
+    #[serde(default)]
+    pub baseline: Option<openvm_sdk::types::VerificationBaselineJson>,
     #[serde(default)]
     pub stat: StarkProofStat,
 }
@@ -77,32 +83,79 @@ impl TryFrom<OpenVmVersionedVmStarkProof> for StarkProof {
     type Error = io::Error;
 
     fn try_from(proof: OpenVmVersionedVmStarkProof) -> io::Result<Self> {
+        let versioned_proof = proof.clone();
         let inner_proof = Proof::<SC>::decode_from_bytes(&proof.proof)?;
-        let mut pv_reader = Cursor::new(proof.user_public_values);
-        // decode_vec is not pub so we have to use the detail inside it ...
-        let len = usize::decode(&mut pv_reader)?;
-        let mut public_values = Vec::with_capacity(len);
-
-        for _ in 0..len {
-            public_values.push(BabyBear::decode(&mut pv_reader)?);
-        }
+        let user_pvs_proof = UserPublicValuesProof::<
+            { openvm_stark_sdk::config::baby_bear_poseidon2::DIGEST_SIZE },
+            BabyBear,
+        >::decode::<SC, _>(&mut Cursor::new(proof.user_pvs_proof))?;
 
         Ok(Self {
             proofs: vec![inner_proof],
-            public_values,
+            public_values: user_pvs_proof.public_values,
+            versioned_proof: Some(versioned_proof),
+            baseline: None,
             stat: Default::default(),
         })
     }
 }
 
+impl StarkProof {
+    pub fn from_vm_stark_proof(
+        proof: VmStarkProof,
+        baseline: Option<VerificationBaselineJson>,
+    ) -> io::Result<Self> {
+        let versioned_proof = OpenVmVersionedVmStarkProof::new(proof.clone())
+            .map_err(|err| io::Error::other(err.to_string()))?;
+        Ok(Self {
+            proofs: vec![proof.inner.clone()],
+            public_values: proof.user_pvs_proof.public_values.clone(),
+            versioned_proof: Some(versioned_proof),
+            baseline,
+            stat: Default::default(),
+        })
+    }
+
+    pub fn try_into_vm_stark_proof(&self) -> io::Result<VmStarkProof> {
+        self.versioned_proof
+            .clone()
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "missing versioned proof payload in StarkProof",
+                )
+            })?
+            .try_into()
+    }
+
+    /// Decode both the recursive proof payload and its verification baseline in one call.
+    ///
+    /// Both pieces are required together by the verify-stark host helpers and the
+    /// `Sdk::verify_proof` entry point, so keeping the extraction (and its error
+    /// messaging) in one place avoids divergence between call sites.
+    pub fn try_into_vm_proof_and_baseline(
+        &self,
+    ) -> io::Result<(VmStarkProof, VerificationBaseline)> {
+        let vm_stark_proof = self.try_into_vm_stark_proof()?;
+        let baseline = self
+            .baseline
+            .clone()
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "missing verification baseline in StarkProof",
+                )
+            })?
+            .into();
+        Ok((vm_stark_proof, baseline))
+    }
+}
+
 pub use openvm_sdk::types::EvmProof as OpenVmEvmProof;
-use snark_verifier_sdk::snark_verifier::{
-    halo2_base::halo2_proofs::halo2curves::bn256::Fr, util::arithmetic::PrimeField,
-};
 
 impl From<OpenVmEvmProof> for EvmProof {
     fn from(value: OpenVmEvmProof) -> Self {
-        let raw_proof: RawEvmProof = value.try_into().expect("fail to convert");
+        let raw_proof: RawEvmProof = value.into();
         let instances = raw_proof
             .instances
             .iter()
@@ -131,27 +184,25 @@ impl From<EvmProof> for OpenVmEvmProof {
             .instances
             .chunks_exact(32)
             .map(|be_bytes| {
-                Fr::from_repr({
-                    let mut le_bytes: [u8; 32] = be_bytes
-                        .try_into()
-                        .expect("instances.len() % 32 == 0 has already been asserted");
-                    le_bytes.reverse();
-                    le_bytes
-                })
-                .expect("Fr::from_repr failed")
+                let mut le_bytes: [u8; 32] = be_bytes
+                    .try_into()
+                    .expect("instances.len() % 32 == 0 has already been asserted");
+                le_bytes.reverse();
+                Fr::from_bytes(&le_bytes).expect("Fr::from_bytes failed")
             })
             .collect::<Vec<Fr>>();
         let raw_proof = RawEvmProof {
             instances,
             proof: value.proof,
         };
-        raw_proof.try_into().expect("fail to convert")
+        raw_proof.into()
     }
 }
 
 /// Lists the proof variants possible in Scroll's proving architecture.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)] // TODO(openvm2): collapse Stark proof shape to remove this size skew.
 pub enum ProofEnum {
     /// Represents a STARK proof used for intermediary layers, i.e. chunk and batch.
     Stark(StarkProof),
@@ -180,7 +231,7 @@ impl ProofEnum {
         }
     }
 
-    /// Get the EVM proof as defined in [`openvm_native_recursion`].
+    /// Get the EVM proof in Scroll's legacy wrapper format.
     ///
     /// Essentially construct a [`OpenVmEvmProof`] from the inner contained [`EvmProof`].
     pub fn as_evm_proof(&self) -> Option<&EvmProof> {

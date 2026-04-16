@@ -5,13 +5,17 @@ use axiom_sdk::input::Input;
 use axiom_sdk::prove::{ProveArgs, ProveSdk};
 use axiom_sdk::{AxiomConfig, AxiomSdk, ProgressCallback, ProofType};
 use chrono::DateTime;
-use openvm_sdk::commit::CommitBytes;
-use openvm_sdk::types::{EvmProof, VersionedVmStarkProof};
+use openvm_continuations::CommitBytes;
+use openvm_sdk::{
+    F,
+    types::{EvmProof, VersionedVmStarkProof},
+};
 use scroll_zkvm_types::ProvingTask as UniversalProvingTask;
 use scroll_zkvm_types::axiom::AxiomProgram;
 use scroll_zkvm_types::proof::ProofEnum;
 use scroll_zkvm_types::types_agg::ProgramCommitment;
 use scroll_zkvm_types::utils::serialize_vk;
+use scroll_zkvm_types::zkvm::program_commitment_from_f_digests;
 use std::env;
 
 pub struct AxiomProver {
@@ -48,10 +52,10 @@ impl AxiomProver {
             .try_into()
             .unwrap();
 
-        let exe = CommitBytes::new(app_exe_commit).to_u32_digest();
-        let vm = CommitBytes::new(vm_commitment).to_u32_digest();
+        let exe_f = <[F; 8]>::from(CommitBytes::new(app_exe_commit));
+        let vm_f = <[F; 8]>::from(CommitBytes::new(vm_commitment));
 
-        Ok(ProgramCommitment { exe, vm })
+        Ok(program_commitment_from_f_digests(exe_f, vm_f))
     }
 }
 
@@ -61,7 +65,7 @@ impl TaskProver for AxiomProver {
     }
 
     fn prove_task(&mut self, t: &UniversalProvingTask, gen_snark: bool) -> eyre::Result<ProofEnum> {
-        let input = serde_json::to_value(t.build_openvm_input())?;
+        let input = serde_json::to_value(t.build_openvm_input()?)?;
 
         let proof_type = if gen_snark {
             ProofType::Evm

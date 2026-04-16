@@ -1,11 +1,9 @@
-use openvm_sdk::commit::AppExecutionCommit;
-use openvm_sdk::keygen::AggVerifyingKey;
-use openvm_sdk::{Sdk, commit::CommitBytes};
+use openvm_continuations::CommitBytes;
+use openvm_sdk::Sdk;
 use scroll_zkvm_types::proof::OpenVmEvmProof;
+use scroll_zkvm_types::zkvm::{AggVerifyingKey, load_agg_vk};
 use scroll_zkvm_types::{proof::StarkProof, utils::serialize_vk};
 use std::path::Path;
-
-pub use scroll_zkvm_types::zkvm::AGG_STARK_PROVING_KEY;
 
 pub struct UniversalVerifier {
     pub evm_verifier: Vec<u8>,
@@ -18,27 +16,10 @@ impl UniversalVerifier {
         stark_proof: &StarkProof,
         vk: &[u8],
     ) -> eyre::Result<()> {
-        let prog_commit = serialize_vk::deserialize(vk);
+        let (vm_stark_proof, baseline) = stark_proof.try_into_vm_proof_and_baseline()?;
+        let _prog_commit = serialize_vk::deserialize(vk);
 
-        /*
-        if stark_proof.exe_commitment != prog_commit.exe {
-            eyre::bail!("evm: mismatch EXE commitment");
-        }
-        if stark_proof.vm_commitment != prog_commit.vm {
-            eyre::bail!("evm: mismatch VM commitment");
-        }
-        */
-
-        use openvm_continuations::verifier::internal::types::VmStarkProof;
-        let vm_stark_proof = VmStarkProof {
-            inner: stark_proof.proofs[0].clone(),
-            user_public_values: stark_proof.public_values.clone(),
-        };
-        let expected_app_commit = AppExecutionCommit {
-            app_exe_commit: CommitBytes::from_u32_digest(&prog_commit.exe),
-            app_vm_commit: CommitBytes::from_u32_digest(&prog_commit.vm),
-        };
-        Sdk::verify_proof(agg_stark_vk, expected_app_commit, &vm_stark_proof)?;
+        Sdk::verify_proof(agg_stark_vk.clone(), baseline, &vm_stark_proof)?;
 
         Ok(())
     }
@@ -47,13 +28,7 @@ impl UniversalVerifier {
         let path_verifier_code = path_verifier.as_ref().join("verifier.bin");
         let path_agg_vk = path_verifier.as_ref().join("root_verifier_vk");
         let evm_verifier = std::fs::read(path_verifier_code)?;
-
-        let loaded_agg_vk = openvm_sdk::fs::read_object_from_file(path_agg_vk).unwrap_or_else(
-            |_|{
-                tracing::warn!("root_Verifier_vk is not avaliable in disk, try to calculate it on-the-fly, which may be time consuming ...");
-                AGG_STARK_PROVING_KEY.get_agg_vk()
-            }
-        );
+        let loaded_agg_vk = load_agg_vk(path_agg_vk);
 
         Ok(Self {
             evm_verifier,
@@ -68,10 +43,10 @@ impl UniversalVerifier {
     pub fn verify_evm_proof(&self, evm_proof: &OpenVmEvmProof, vk: &[u8]) -> eyre::Result<()> {
         let prog_commit = serialize_vk::deserialize(vk);
 
-        if evm_proof.app_commit.app_exe_commit.to_u32_digest() != prog_commit.exe {
+        if evm_proof.app_commit.app_exe_commit != CommitBytes::from(prog_commit.exe) {
             eyre::bail!("evm: mismatch EXE commitment");
         }
-        if evm_proof.app_commit.app_vm_commit.to_u32_digest() != prog_commit.vm {
+        if evm_proof.app_commit.app_vm_commit != CommitBytes::from(prog_commit.vm) {
             eyre::bail!("evm: mismatch VM commitment");
         }
 

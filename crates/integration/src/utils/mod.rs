@@ -315,14 +315,10 @@ pub fn build_batch_witnesses(
         .iter()
         .map(|chunk_info| {
             let pi_hash = chunk_info.pi_hash_by_version(version);
-            AggregationInput {
-                public_values: pi_hash
-                    .as_slice()
-                    .iter()
-                    .map(|&b| b as u32)
-                    .collect::<Vec<_>>(),
+            AggregationInput::new(
+                pi_hash.as_slice().iter().map(|&b| b as u32).collect(),
                 commitment,
-            }
+            )
         })
         .collect::<Vec<_>>();
 
@@ -388,14 +384,10 @@ pub fn build_batch_witnesses_validium(
         .iter()
         .map(|chunk_info| {
             let pi_hash = chunk_info.pi_hash_by_version(version);
-            AggregationInput {
-                public_values: pi_hash
-                    .as_slice()
-                    .iter()
-                    .map(|&b| b as u32)
-                    .collect::<Vec<_>>(),
+            AggregationInput::new(
+                pi_hash.as_slice().iter().map(|&b| b as u32).collect(),
                 commitment,
-            }
+            )
         })
         .collect::<Vec<_>>();
 

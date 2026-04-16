@@ -1,7 +1,9 @@
 use crate::axiom::AxiomProver;
 use cargo_metadata::MetadataCommand;
 use once_cell::sync::OnceCell;
-use openvm_sdk::{Sdk, StdIn};
+use openvm_sdk::{DeferralInput, Sdk, StdIn, config::AggregationSystemParams};
+use openvm_verify_stark_circuit::extension::{get_deferral_state, get_raw_deferral_results};
+use openvm_verify_stark_host::vk::VmStarkVerifyingKey;
 use scroll_zkvm_prover::{
     Prover,
     setup::{read_app_config, read_app_exe},
@@ -12,10 +14,12 @@ use scroll_zkvm_types::{
     ProvingTask as UniversalProvingTask,
     proof::{EvmProof, ProofEnum, StarkProof},
     public_inputs::{ForkName, Version},
+    task::AggregatedProofMetadata,
     types_agg::ProgramCommitment,
     utils::serialize_vk,
+    zkvm::{AggVerifyingKey, load_agg_vk},
 };
-use scroll_zkvm_verifier::verifier::{AGG_STARK_PROVING_KEY, UniversalVerifier};
+use scroll_zkvm_verifier::verifier::UniversalVerifier;
 use std::collections::HashMap;
 use std::{
     path::{Path, PathBuf},
@@ -109,6 +113,9 @@ pub static AXIOM_PROGRAM_IDS: LazyLock<HashMap<String, AxiomProgram>> = LazyLock
     program_ids
 });
 
+pub static AGG_STARK_VERIFYING_KEY: LazyLock<AggVerifyingKey> =
+    LazyLock::new(|| load_agg_vk(ASSET_BASE_DIR.join("verifier").join("root_verifier_vk")));
+
 /// Every test run will write assets to a new directory.
 ///
 /// Possibly one of the following:
@@ -116,6 +123,32 @@ pub static AXIOM_PROGRAM_IDS: LazyLock<HashMap<String, AxiomProgram>> = LazyLock
 /// - <DIR_OUTPUT>/batch-tests-{timestamp}
 /// - <DIR_OUTPUT>/bundle-tests-{timestamp}
 pub static DIR_TESTRUN: OnceCell<PathBuf> = OnceCell::new();
+
+fn aggregated_proof_metadata_from_stark_proof(
+    proof: &StarkProof,
+) -> eyre::Result<AggregatedProofMetadata> {
+    let (vm_stark_proof, baseline) = proof.try_into_vm_proof_and_baseline()?;
+    let vk = VmStarkVerifyingKey {
+        mvk: AGG_STARK_VERIFYING_KEY.clone(),
+        baseline,
+    };
+    let input_commit: [u8; 32] =
+        get_raw_deferral_results(&vk, std::slice::from_ref(&vm_stark_proof))?
+            .into_iter()
+            .next()
+            .ok_or_else(|| eyre::eyre!("missing deferral result for recursive child proof"))?
+            .input
+            .try_into()
+            .map_err(|bytes: Vec<u8>| {
+                eyre::eyre!("expected 32-byte input_commit, got {}", bytes.len())
+            })?;
+
+    Ok(AggregatedProofMetadata {
+        input_commit,
+        deferral_state: get_deferral_state(&vk, std::slice::from_ref(&vm_stark_proof), 0)?,
+        deferral_input: DeferralInput::from_inputs(std::slice::from_ref(&vm_stark_proof)),
+    })
+}
 
 pub trait PartialProvingTask: serde::Serialize {
     fn identifier(&self) -> String;
@@ -236,9 +269,15 @@ pub trait ProverTester {
         witness: &Self::Witness,
         aggregated_proofs: impl Iterator<Item = &'a StarkProof>,
     ) -> eyre::Result<UniversalProvingTask> {
+        let aggregated_proofs = aggregated_proofs.cloned().collect::<Vec<_>>();
+        let aggregated_proof_metadata = aggregated_proofs
+            .iter()
+            .map(aggregated_proof_metadata_from_stark_proof)
+            .collect::<eyre::Result<Vec<_>>>()?;
         Ok(UniversalProvingTask {
             serialized_witness: vec![witness.archive()?],
-            aggregated_proofs: aggregated_proofs.cloned().collect(),
+            aggregated_proofs,
+            aggregated_proof_metadata,
             fork_name: witness.fork_name().as_str().to_string(),
             identifier: witness.identifier(),
             vk: Default::default(),
@@ -268,11 +307,12 @@ impl TaskProver for Prover {
     fn prove_task(&mut self, t: &UniversalProvingTask, gen_snark: bool) -> eyre::Result<ProofEnum> {
         use scroll_zkvm_prover::task::ProvingTask;
         let stdin = t.build_guest_input();
+        let def_inputs = t.build_deferral_inputs();
         if !gen_snark {
             // gen stark proof
-            Ok(self.gen_proof_stark(stdin)?.into())
+            Ok(self.gen_proof_stark(stdin, &def_inputs)?.into())
         } else {
-            let proof: EvmProof = self.gen_proof_snark(stdin)?.into();
+            let proof: EvmProof = self.gen_proof_snark(stdin, &def_inputs)?.into();
             Ok(proof.into())
         }
     }
@@ -358,7 +398,7 @@ pub fn tester_execute<T: ProverTester>(
     )?;
 
     let app_vm_config = app_config.app_vm_config.clone();
-    let sdk = Sdk::new(app_config)?;
+    let sdk = Sdk::new(app_config, AggregationSystemParams::default())?;
     let ret = scroll_zkvm_prover::utils::vm::execute_guest(
         &sdk,
         app_vm_config.as_ref(),
@@ -408,9 +448,9 @@ pub fn prove_verify<T: ProverTester>(
         proof
     };
 
-    // Verify proof.
+    // Verify against the STARK aggregation VK; independent of Halo2 assets.
     UniversalVerifier::verify_stark_proof_with_vk(
-        &AGG_STARK_PROVING_KEY.get_agg_vk(),
+        &AGG_STARK_VERIFYING_KEY,
         proof.as_stark_proof().expect("should be stark proof"),
         &vk,
     )?;

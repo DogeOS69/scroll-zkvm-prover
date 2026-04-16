@@ -5,6 +5,23 @@ pub struct AggregationInput {
     pub public_values: Vec<u32>,
     /// Represent the commitment needed to verify a root proof
     pub commitment: ProgramCommitment,
+    /// Optional proof-instance input commit used by the verify-stark guest.
+    #[serde(default)]
+    pub input_commit: Option<[u8; 32]>,
+}
+
+impl AggregationInput {
+    /// Construct an aggregation input without a pre-computed `input_commit`.
+    ///
+    /// Host-side task assembly typically leaves `input_commit` unset — the guest recomputes
+    /// it from the proof payload — so this is the common constructor.
+    pub fn new(public_values: Vec<u32>, commitment: ProgramCommitment) -> Self {
+        Self {
+            public_values,
+            commitment,
+            input_commit: None,
+        }
+    }
 }
 
 /// Represent the commitment needed to verify a [`RootProof`].

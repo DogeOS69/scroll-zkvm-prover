@@ -123,14 +123,10 @@ impl BundleTaskGenerator {
             }
 
             let pi_hash = info.pi_hash_by_version(version);
-            let proof = AggregationInput {
-                public_values: pi_hash
-                    .as_slice()
-                    .iter()
-                    .map(|&b| b as u32)
-                    .collect::<Vec<_>>(),
+            let proof = AggregationInput::new(
+                pi_hash.as_slice().iter().map(|&b| b as u32).collect(),
                 commitment,
-            };
+            );
             batch_proofs.push(proof);
             batch_infos.push(info);
         }

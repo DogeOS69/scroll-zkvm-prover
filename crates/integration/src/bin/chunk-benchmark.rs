@@ -1,10 +1,8 @@
-#![feature(exit_status_error)]
 //! Run `make bench-execute-chunk` to execute this benchmark.
 use clap::Parser;
-use openvm_benchmarks_prove::util::BenchmarkCli;
+use openvm_benchmarks_prove::BenchmarkCli;
 use openvm_benchmarks_utils::build_elf;
-use openvm_circuit::openvm_stark_sdk::bench::run_with_metric_collection;
-use openvm_sdk::config::{SdkVmBuilder, SdkVmConfig};
+use openvm_sdk_config::SdkVmConfig;
 use scroll_zkvm_integration::testers::chunk::{
     ChunkProverTester, get_witness_from_env_or_builder, preset_chunk,
 };
@@ -26,9 +24,8 @@ fn main() -> eyre::Result<()> {
 
     let args: BenchmarkCli = BenchmarkCli::parse();
 
-    let app_vm_config =
-        SdkVmConfig::from_toml(include_str!("../../../circuits/chunk-circuit/openvm.toml"))?
-            .app_vm_config;
+    let vm_config =
+        SdkVmConfig::from_toml(include_str!("../../../circuits/chunk-circuit/openvm.toml"))?;
 
     let project_path = WORKSPACE_ROOT
         .join("crates")
@@ -48,25 +45,24 @@ fn main() -> eyre::Result<()> {
 
     let wit = get_witness_from_env_or_builder(&mut preset_chunk())?;
 
-    run_with_metric_collection("OUTPUT_PATH", || {
-        args.bench_from_exe::<SdkVmBuilder, _>(
-            "chunk-circuit",
-            app_vm_config,
-            elf,
-            ChunkProverTester::build_guest_input(&wit, std::iter::empty())?,
-        )
-    })?;
+    args.run(
+        vm_config,
+        elf,
+        ChunkProverTester::build_guest_input(&wit, std::iter::empty())?,
+    )?;
 
     // exec flamegraph generation script
     if args.profiling {
-        Command::new("python3")
+        let status = Command::new("python3")
             .arg(WORKSPACE_ROOT.join("scripts").join("flamegraph.py"))
             .arg(metrics_path)
             .arg("--guest-symbols")
             .arg(symbol_path)
             .current_dir(output)
-            .status()?
-            .exit_ok()?;
+            .status()?;
+        if !status.success() {
+            eyre::bail!("flamegraph.py failed with status {status}");
+        }
     }
 
     Ok(())

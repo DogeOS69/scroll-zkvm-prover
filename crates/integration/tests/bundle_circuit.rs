@@ -245,13 +245,8 @@ fn test_galileov2_bundle_pi_hash_metadata_only() -> eyre::Result<()> {
         metadata_from_batch_witnesses(&batch_1)?,
         metadata_from_batch_witnesses(&batch_2)?,
     ];
-    let batch_proofs = vec![
-        AggregationInput {
-            public_values: vec![0; 32],
-            commitment: ProgramCommitment::default(),
-        };
-        batch_infos.len()
-    ];
+    let batch_proofs =
+        vec![AggregationInput::new(vec![0; 32], ProgramCommitment::default()); batch_infos.len()];
     let witness = BundleWitness {
         version: testing_version().as_version_byte(),
         batch_infos,
