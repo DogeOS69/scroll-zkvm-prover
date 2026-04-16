@@ -30,3 +30,4 @@ bincode_v1.workspace = true
 
 [features]
 scroll = ["types-chunk/scroll", "types-chunk/host"]
+openvm-input = []

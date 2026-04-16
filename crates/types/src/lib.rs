@@ -27,6 +27,7 @@ pub mod proof;
 pub mod task;
 pub use task::ProvingTask;
 
+#[cfg(feature = "openvm-input")]
 pub mod openvm;
 
 pub mod axiom;

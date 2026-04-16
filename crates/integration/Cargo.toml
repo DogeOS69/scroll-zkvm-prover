@@ -12,7 +12,7 @@ name = "chunk-scanner"
 path = "src/bin/chunk-scanner.rs"
 
 [dependencies]
-scroll-zkvm-types.workspace = true
+scroll-zkvm-types = { workspace = true, features = ["openvm-input"] }
 scroll-zkvm-prover.workspace = true
 scroll-zkvm-verifier.workspace = true
 
