@@ -62,11 +62,11 @@ openvm-verify-stark-guest = { git = "https://github.com/openvm-org/openvm.git", 
 # more openvm related libs
 openvm-stark-sdk = { git = "https://github.com/openvm-org/stark-backend.git", tag = "v2.0.0-beta.2", default-features = false }
 
-sbv-core = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2" }
-sbv-helpers = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2", features = ["dev"] }
-sbv-primitives = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2" }
-sbv-utils = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2" }
-sbv-trie = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2" }
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier.git", branch = "experiment/openvm2" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier.git", branch = "experiment/openvm2", features = ["dev"] }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier.git", branch = "experiment/openvm2" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier.git", branch = "experiment/openvm2" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier.git", branch = "experiment/openvm2" }
 
 alloy-consensus = "=1.0.41"
 alloy-provider = "1.0"
@@ -136,13 +136,6 @@ scroll-zkvm-types-bundle = { path = "crates/types/bundle" }
 scroll-zkvm-integration = { path = "crates/integration" }
 scroll-zkvm-prover = { path = "crates/prover" }
 scroll-zkvm-verifier = { path = "crates/verifier" }
-
-[patch."https://github.com/scroll-tech/stateless-block-verifier"]
-sbv-core = { path = "../stateless-block-verifier/crates/core" }
-sbv-helpers = { path = "../stateless-block-verifier/crates/helpers" }
-sbv-primitives = { path = "../stateless-block-verifier/crates/primitives" }
-sbv-trie = { path = "../stateless-block-verifier/crates/trie" }
-sbv-utils = { path = "../stateless-block-verifier/crates/utils" }
 
 [patch.crates-io]
 alloy-evm = { git = "https://github.com/alloy-rs/alloy-evm", tag = "v0.22.2" }

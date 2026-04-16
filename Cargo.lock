@@ -6707,6 +6707,7 @@ dependencies = [
 [[package]]
 name = "reth-chainspec"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -6726,6 +6727,7 @@ dependencies = [
 [[package]]
 name = "reth-codecs"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -6743,6 +6745,7 @@ dependencies = [
 [[package]]
 name = "reth-codecs-derive"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6752,6 +6755,7 @@ dependencies = [
 [[package]]
 name = "reth-consensus"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -6764,6 +6768,7 @@ dependencies = [
 [[package]]
 name = "reth-consensus-common"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -6775,6 +6780,7 @@ dependencies = [
 [[package]]
 name = "reth-db-models"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-eips 1.0.41",
  "alloy-primitives",
@@ -6784,6 +6790,7 @@ dependencies = [
 [[package]]
 name = "reth-errors"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "reth-consensus",
  "reth-execution-errors",
@@ -6794,6 +6801,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-consensus"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -6809,6 +6817,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-forks"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-eip2124",
  "alloy-hardforks",
@@ -6820,6 +6829,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-primitives"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -6836,6 +6846,7 @@ dependencies = [
 [[package]]
 name = "reth-evm"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -6857,6 +6868,7 @@ dependencies = [
 [[package]]
 name = "reth-evm-ethereum"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -6876,6 +6888,7 @@ dependencies = [
 [[package]]
 name = "reth-execution-errors"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-evm",
  "alloy-primitives",
@@ -6888,6 +6901,7 @@ dependencies = [
 [[package]]
 name = "reth-execution-types"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -6903,6 +6917,7 @@ dependencies = [
 [[package]]
 name = "reth-network-peers"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -6914,6 +6929,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "once_cell",
@@ -6926,6 +6942,7 @@ dependencies = [
 [[package]]
 name = "reth-primitives-traits"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -6953,6 +6970,7 @@ dependencies = [
 [[package]]
 name = "reth-prune-types"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-primitives",
  "derive_more 2.0.1",
@@ -6962,6 +6980,7 @@ dependencies = [
 [[package]]
 name = "reth-revm"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-primitives",
  "reth-primitives-traits",
@@ -6973,6 +6992,7 @@ dependencies = [
 [[package]]
 name = "reth-scroll-chainspec"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -6997,6 +7017,7 @@ dependencies = [
 [[package]]
 name = "reth-scroll-evm"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -7026,6 +7047,7 @@ dependencies = [
 [[package]]
 name = "reth-scroll-forks"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -7039,6 +7061,7 @@ dependencies = [
 [[package]]
 name = "reth-scroll-primitives"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -7055,6 +7078,7 @@ dependencies = [
 [[package]]
 name = "reth-stages-types"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-primitives",
  "reth-trie-common",
@@ -7063,6 +7087,7 @@ dependencies = [
 [[package]]
 name = "reth-stateless"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -7088,6 +7113,7 @@ dependencies = [
 [[package]]
 name = "reth-static-file-types"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-primitives",
  "derive_more 2.0.1",
@@ -7098,6 +7124,7 @@ dependencies = [
 [[package]]
 name = "reth-storage-api"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -7119,6 +7146,7 @@ dependencies = [
 [[package]]
 name = "reth-storage-errors"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-eips 1.0.41",
  "alloy-primitives",
@@ -7134,6 +7162,7 @@ dependencies = [
 [[package]]
 name = "reth-trie"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -7155,6 +7184,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-common"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -7170,6 +7200,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-sparse"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -7185,6 +7216,7 @@ dependencies = [
 [[package]]
 name = "reth-zstd-compressors"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "zstd",
 ]
@@ -7991,6 +8023,7 @@ dependencies = [
 [[package]]
 name = "sbv-core"
 version = "2.0.0"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier.git?branch=experiment%2Fopenvm2#4a829ac90e4961f10567f76fa85c5eb829517ef4"
 dependencies = [
  "auto_impl",
  "itertools 0.14.0",
@@ -8006,6 +8039,7 @@ dependencies = [
 [[package]]
 name = "sbv-helpers"
 version = "2.0.0"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier.git?branch=experiment%2Fopenvm2#4a829ac90e4961f10567f76fa85c5eb829517ef4"
 dependencies = [
  "tracing",
 ]
@@ -8013,6 +8047,7 @@ dependencies = [
 [[package]]
 name = "sbv-primitives"
 version = "2.0.0"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier.git?branch=experiment%2Fopenvm2#4a829ac90e4961f10567f76fa85c5eb829517ef4"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -8046,6 +8081,7 @@ dependencies = [
 [[package]]
 name = "sbv-trie"
 version = "2.0.0"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier.git?branch=experiment%2Fopenvm2#4a829ac90e4961f10567f76fa85c5eb829517ef4"
 dependencies = [
  "alloy-rlp",
  "alloy-trie 0.9.1",
@@ -8058,6 +8094,7 @@ dependencies = [
 [[package]]
 name = "sbv-utils"
 version = "2.0.0"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier.git?branch=experiment%2Fopenvm2#4a829ac90e4961f10567f76fa85c5eb829517ef4"
 dependencies = [
  "alloy-provider",
  "alloy-transport",
@@ -8111,6 +8148,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 [[package]]
 name = "scroll-alloy-consensus"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -8126,6 +8164,7 @@ dependencies = [
 [[package]]
 name = "scroll-alloy-evm"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
@@ -8143,6 +8182,7 @@ dependencies = [
 [[package]]
 name = "scroll-alloy-hardforks"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-hardforks",
  "auto_impl",
@@ -8152,6 +8192,7 @@ dependencies = [
 [[package]]
 name = "scroll-alloy-network"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -8166,6 +8207,7 @@ dependencies = [
 [[package]]
 name = "scroll-alloy-rpc-types"
 version = "1.8.2"
+source = "git+https://github.com/dghelm/scroll-reth.git?branch=experiment%2Fopenvm2#fa8b15977c22575af9d7689c7244feb3b7998d14"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.0.41",
