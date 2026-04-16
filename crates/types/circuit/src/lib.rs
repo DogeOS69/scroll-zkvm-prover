@@ -61,7 +61,7 @@ where
 
         for proof in proofs.iter() {
             Self::verify_commitments(&proof.commitment);
-            verify_proof(&proof.commitment, proof.public_values.as_slice());
+            verify_proof(proof);
         }
 
         proofs
@@ -98,31 +98,42 @@ where
 }
 
 /// Verify a root proof. The real "proof" will be loaded from StdIn.
-fn verify_proof(commitment: &ProgramCommitment, public_inputs: &[u32]) {
+fn verify_proof(proof: &AggregationInput) {
+    let commitment = &proof.commitment;
+    let public_inputs = proof.public_values.as_slice();
+
     // Sanity check for the number of public-input values.
     assert_eq!(public_inputs.len(), NUM_PUBLIC_VALUES);
 
-    const HEAP_START_ADDRESS: u32 = 1 << 24;
-    const FIELDS_PER_U32: u32 = 4;
-
-    // Store the expected public values into the beginning of the native heap.
-    // Copied from https://github.com/openvm-org/openvm/blob/4973d38cb3f2e14ebdd59e03802e65bb657ee422/guest-libs/verify_stark/src/lib.rs#L37
-    let mut native_addr = HEAP_START_ADDRESS;
-    for &x in &commitment.exe {
-        openvm::io::store_u32_to_native(native_addr, x);
-        native_addr += FIELDS_PER_U32;
-    }
-    for &x in &commitment.vm {
-        openvm::io::store_u32_to_native(native_addr, x);
-        native_addr += FIELDS_PER_U32;
-    }
-    for &x in public_inputs {
-        openvm::io::store_u32_to_native(native_addr, x);
-        native_addr += FIELDS_PER_U32;
-    }
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-    unsafe {
-        std::arch::asm!(include_str!("../../../build-guest/root_verifier.asm"),)
+    {
+        use openvm::io::read;
+        use openvm_verify_stark_guest::{ProofOutput, verify_stark};
+
+        fn u32_words_to_commit(words: &[u32; 8]) -> [u8; 32] {
+            let mut bytes = [0u8; 32];
+            for (dst, word) in bytes.chunks_exact_mut(4).zip(words.iter()) {
+                dst.copy_from_slice(&word.to_le_bytes());
+            }
+            bytes
+        }
+
+        fn u32_words_to_bytes(words: &[u32]) -> Vec<u8> {
+            let mut bytes = Vec::with_capacity(words.len() * 4);
+            for word in words {
+                bytes.extend_from_slice(&word.to_le_bytes());
+            }
+            bytes
+        }
+
+        let expected = ProofOutput {
+            app_exe_commit: u32_words_to_commit(&commitment.exe),
+            app_vm_commit: u32_words_to_commit(&commitment.vm),
+            user_public_values: u32_words_to_bytes(public_inputs),
+        };
+
+        let input_commit = proof.input_commit.unwrap_or_else(read);
+        verify_stark::<0>(&input_commit, &expected);
     }
 }
 

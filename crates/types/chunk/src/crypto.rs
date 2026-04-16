@@ -1,5 +1,6 @@
 use alloy_consensus::crypto::RecoveryError;
 use alloy_primitives::Address;
+use openvm_sha2::Digest;
 use sbv_primitives::types::revm::precompile;
 use sbv_primitives::types::revm::precompile::PrecompileError;
 use std::sync::Arc;
@@ -28,7 +29,7 @@ impl Crypto {
 impl precompile::Crypto for Crypto {
     #[inline]
     fn sha256(&self, input: &[u8]) -> [u8; 32] {
-        openvm_sha2::sha256(input)
+        openvm_sha2::Sha256::digest(input).into()
     }
 
     #[inline]

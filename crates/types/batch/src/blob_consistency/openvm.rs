@@ -8,6 +8,7 @@ use itertools::Itertools;
 use openvm_ecc_guest::{AffinePoint, CyclicGroup, msm, weierstrass::WeierstrassPoint};
 use openvm_pairing::bls12_381::{Bls12_381, G1Affine, G2Affine, Scalar};
 use openvm_pairing_guest::{algebra, pairing::PairingCheck};
+use openvm_sha2::Digest;
 
 use super::types::ToIntrinsic;
 use crate::blob_consistency::constants::KZG_G2_SETUP_BYTES;
@@ -102,7 +103,7 @@ pub fn point_evaluation(
 ///
 /// We use the [`openvm_sha256_guest`] extension to compute the SHA-256 digest.
 pub fn kzg_to_versioned_hash(kzg_commitment: &[u8]) -> [u8; 32] {
-    let mut hash = openvm_sha2::sha256(kzg_commitment);
+    let mut hash: [u8; 32] = openvm_sha2::Sha256::digest(kzg_commitment).into();
     hash[0] = VERSIONED_HASH_VERSION_KZG;
     hash
 }

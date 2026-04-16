@@ -1,8 +1,13 @@
+use openvm_sha2::Digest;
 use scroll_zkvm_types_chunk::Crypto;
 use scroll_zkvm_types_circuit::{Circuit, public_inputs::PublicInputs, reveal_pi_hash};
 
 mod circuit;
 use circuit::ChunkCircuit as C;
+
+fn sha256_digest(input: &[u8], output: &mut [u8; 32]) {
+    *output = openvm_sha2::Sha256::digest(input).into();
+}
 
 openvm::entry!(main);
 
@@ -10,9 +15,7 @@ fn main() {
     Crypto::install();
 
     ecies::sha256::set_digest_provider(|| {
-        Box::new(ecies::sha256::ext::ExtSha256Core::new(
-            openvm_sha2::set_sha256,
-        ))
+        Box::new(ecies::sha256::ext::ExtSha256Core::new(sha256_digest))
     })
     .unwrap();
 

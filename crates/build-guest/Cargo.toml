@@ -6,16 +6,18 @@ edition.workspace = true
 [dependencies]
 scroll-zkvm-types.workspace = true
 
-openvm-instructions.workspace = true
-openvm-native-compiler.workspace = true
-openvm-native-recursion.workspace = true
-openvm-sdk.workspace = true
-openvm-stark-sdk.workspace = true
 openvm-build = { workspace = true, default-features = false }
+openvm-continuations = { workspace = true, default-features = false }
+openvm-sdk = { workspace = true, default-features = false, features = [
+  "parallel",
+  "evm-verify",
+  "unprotected",
+] }
+openvm-sdk-config = { workspace = true, default-features = false }
+openvm-stark-sdk.workspace = true
 eyre.workspace = true
 hex.workspace = true
 serde_json.workspace = true
-snark-verifier-sdk.workspace = true
 toml.workspace = true
 
 cargo_metadata.workspace = true

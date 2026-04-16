@@ -22,6 +22,8 @@
 //! - `--mode <MODE>`: Generation mode (auto|force)
 //!   - `auto`: Skip generation if output files already exist (default, faster for development)
 //!   - `force`: Always regenerate all files (use for clean builds or CI)
+//! - `--skip-halo2-verifier`: Skip Halo2/EVM verifier generation and only write the STARK-side
+//!   aggregation VK needed for recursive proof flows
 //!
 //! ## Environment Variables:
 //! - `BUILD_PROJECT`: Comma-separated list of projects to build (e.g., "chunk,batch").
@@ -36,22 +38,19 @@ use clap::{Parser, ValueEnum};
 use dotenvy::dotenv;
 use eyre::Result;
 use openvm_build::GuestOptions;
-use openvm_instructions::exe::VmExe;
-use openvm_native_compiler::ir::DIGEST_SIZE;
+use openvm_continuations::CommitBytes;
 use openvm_sdk::{
     F, Sdk,
-    commit::CommitBytes,
-    config::{AppConfig, SdkVmConfig},
-    fs::write_object_to_file,
-    prover::AppProver,
+    config::AppConfig,
+    fs::{write_evm_halo2_verifier_to_folder, write_object_to_file},
+    openvm_circuit::arch::instructions::exe::VmExe,
 };
-use openvm_stark_sdk::p3_bn254_fr::Bn254Fr;
-use scroll_zkvm_types::zkvm::AGG_STARK_PROVING_KEY;
-use snark_verifier_sdk::snark_verifier::loader::evm::compile_solidity;
+use openvm_sdk_config::SdkVmConfig;
+use openvm_stark_sdk::config::baby_bear_poseidon2::DIGEST_SIZE;
+use scroll_zkvm_types::zkvm::{default_riscv32_sdk, program_commitment_from_f_digests};
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    sync::Arc,
     time::Instant,
 };
 
@@ -78,6 +77,10 @@ struct Cli {
     /// Output directory name under releases/ (default: "dev")
     #[arg(long, default_value = "dev")]
     output: String,
+
+    /// Skip Halo2/EVM verifier generation and only emit the STARK-side aggregation VK.
+    #[arg(long, default_value_t = false)]
+    skip_halo2_verifier: bool,
 }
 
 const LOG_PREFIX: &str = "[build-guest]";
@@ -105,23 +108,13 @@ fn write_commitment_as_evm_hex(
     output_path: &PathBuf,
     commitment: [u32; DIGEST_SIZE],
 ) -> Result<()> {
-    let digest_bytes = compress_commitment(&commitment)
-        .value
-        .to_bytes()
-        .into_iter()
-        .rev() // To big endian
-        .collect::<Vec<u8>>();
+    let digest_bytes = CommitBytes::from(commitment).as_slice().to_vec();
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
     }
     fs::write(output_path, hex::encode(digest_bytes))?;
     println!("{LOG_PREFIX} Wrote commitment to {}", output_path.display());
     Ok(())
-}
-/// Compresses an 8-element u32 commitment into a single Fr element.
-/// Used for generating digests compatible with on-chain verifiers.
-fn compress_commitment(commitment: &[u32; DIGEST_SIZE]) -> Bn254Fr {
-    CommitBytes::from_u32_digest(commitment).to_bn254()
 }
 
 /// Builds guest programs, transpiles them, and generates executable commitments.
@@ -185,7 +178,10 @@ fn generate_app_assets(workspace_dir: &Path, release_output_dir: &PathBuf) -> Re
             ..Default::default()
         };
         let guest_opts = guest_opts.with_profile("maxperf".to_string());
-        let sdk = Sdk::new(app_config)?;
+        let sdk = Sdk::new(
+            app_config,
+            openvm_sdk::config::AggregationSystemParams::default(),
+        )?;
         let elf = sdk
             .build(guest_opts, project_dir, &Default::default(), None)
             .inspect_err(|_err| {
@@ -221,39 +217,31 @@ fn generate_app_assets(workspace_dir: &Path, release_output_dir: &PathBuf) -> Re
         println!("{LOG_PREFIX} exe written to {path_app_exe:?}");
 
         // 3. Compute and Write Executable Commitment
-        let app_pk = sdk.app_pk();
-        let app_prover: AppProver<openvm_sdk::DefaultStarkEngine, _> = AppProver::new(
-            *sdk.app_vm_builder(),
-            &app_pk.app_vm_pk,
-            Arc::new(app_exe),
-            app_pk.leaf_committed_exe.get_program_commit(),
-        )?;
-        let app_comm = app_prover.app_commit();
-        let exe_commit_u32 = app_comm.app_exe_commit.to_u32_digest();
-        let vm_commit_u32 = app_comm.app_vm_commit.to_u32_digest();
+        let stark_prover = sdk.prover(app_exe.clone())?;
+        let commitment = program_commitment_from_f_digests(
+            stark_prover.app_prover.app_exe_commit(),
+            stark_prover.app_vm_commit(),
+        );
 
         write_commitment(
             &Path::new(project_dir).join(format!("{project_name}_exe_commit.rs")),
-            exe_commit_u32,
+            commitment.exe,
         )?;
         write_commitment(
             &Path::new(project_dir).join(format!("{project_name}_vm_commit.rs")),
-            vm_commit_u32,
+            commitment.vm,
         )?;
 
         // Special handling for bundle project
         if project_name == "bundle" {
             let output_path = release_output_dir.join(project_name).join("digest_1.hex");
-            write_commitment_as_evm_hex(&output_path, exe_commit_u32)?;
+            write_commitment_as_evm_hex(&output_path, commitment.exe)?;
             let output_path = release_output_dir.join(project_name).join("digest_2.hex");
-            write_commitment_as_evm_hex(&output_path, vm_commit_u32)?;
+            write_commitment_as_evm_hex(&output_path, commitment.vm)?;
         }
 
-        use scroll_zkvm_types::{types_agg::ProgramCommitment, utils::serialize_vk};
-        let app_vk = serialize_vk::serialize(&ProgramCommitment {
-            exe: exe_commit_u32,
-            vm: vm_commit_u32,
-        });
+        use scroll_zkvm_types::utils::serialize_vk;
+        let app_vk = serialize_vk::serialize(&commitment);
 
         let app_vk = hex::encode(&app_vk);
         println!("{project_name}: {app_vk}");
@@ -297,30 +285,31 @@ fn generate_root_verifier(workspace_dir: &Path, force_overwrite: bool) -> Result
         return Ok(());
     }
 
-    let asm = Sdk::riscv32().generate_root_verifier_asm();
-    fs::write(&root_verifier_path, asm).expect("fail to write");
-
-    println!(
-        "{LOG_PREFIX} Root verifier generated at: {}",
-        root_verifier_path.display()
-    );
+    println!("{LOG_PREFIX} Root verifier assembly generation is not performed by this tool.");
 
     Ok(())
 }
 
 fn generate_evm_verifier(
     verifier_output_dir: &PathBuf,
-    recompute_mode: bool,
     force_overwrite: bool,
+    skip_halo2_verifier: bool,
 ) -> Result<()> {
     println!("{LOG_PREFIX} === Dumping EVM VERIFIER ===");
     let path_verifier_sol = verifier_output_dir.join("verifier.sol");
     let path_verifier_bin = verifier_output_dir.join("verifier.bin");
     let path_root_agg_pk = verifier_output_dir.join("root_verifier_vk");
+    let sdk = default_riscv32_sdk();
 
     if force_overwrite || !path_root_agg_pk.exists() {
-        write_object_to_file(&path_root_agg_pk, AGG_STARK_PROVING_KEY.get_agg_vk())
-            .expect("fail to write");
+        write_object_to_file(&path_root_agg_pk, sdk.agg_vk().as_ref().clone())?;
+    }
+
+    if skip_halo2_verifier {
+        println!(
+            "{LOG_PREFIX} Skipping Halo2/EVM verifier generation; wrote root_verifier_vk only."
+        );
+        return Ok(());
     }
 
     // Check if files exist and skip if in auto mode
@@ -335,16 +324,12 @@ fn generate_evm_verifier(
         fs::create_dir_all(parent)?;
     }
 
-    let verifier_sol = if recompute_mode {
-        verifier::generate_evm_verifier()?
-    } else {
-        verifier::download_evm_verifier()?
-    };
-    fs::write(&path_verifier_sol, &verifier_sol)?;
+    let evm_verifier = verifier::generate_evm_verifier(&sdk)?;
+    write_evm_halo2_verifier_to_folder(evm_verifier.clone(), verifier_output_dir)?;
+    fs::write(&path_verifier_sol, &evm_verifier.openvm_verifier_code)?;
     println!("{LOG_PREFIX} verifier_sol written to {path_verifier_sol:?}");
 
-    let verifier_bin = compile_solidity(&verifier_sol);
-    fs::write(&path_verifier_bin, &verifier_bin)?;
+    fs::write(&path_verifier_bin, &evm_verifier.artifact.bytecode)?;
     println!("{LOG_PREFIX} verifier_bin written to {path_verifier_bin:?}");
 
     Ok(())
@@ -354,12 +339,17 @@ fn generate_openvm_assets(
     workspace_dir: &PathBuf,
     release_output_dir: &PathBuf,
     force_overwrite: bool,
+    skip_halo2_verifier: bool,
 ) -> Result<()> {
     // to use the 'foundry.toml'
     env::set_current_dir(workspace_dir)?;
 
     generate_root_verifier(workspace_dir, force_overwrite)?;
-    generate_evm_verifier(&release_output_dir.join("verifier"), false, force_overwrite)?;
+    generate_evm_verifier(
+        &release_output_dir.join("verifier"),
+        force_overwrite,
+        skip_halo2_verifier,
+    )?;
     Ok(())
 }
 
@@ -367,7 +357,13 @@ pub fn main() -> Result<()> {
     let cli = Cli::parse();
 
     println!("{LOG_PREFIX} Generation mode: {:?}", cli.mode);
-    println!("{LOG_PREFIX} Will generate both app and openvm assets");
+    if cli.skip_halo2_verifier {
+        println!(
+            "{LOG_PREFIX} Will generate app assets plus STARK-side openvm assets only (Halo2 verifier skipped)"
+        );
+    } else {
+        println!("{LOG_PREFIX} Will generate both app and openvm assets");
+    }
 
     // Set current directory to the crate's root
     let manifest_dir = env::var("CARGO_MANIFEST_DIR")?;
@@ -391,7 +387,12 @@ pub fn main() -> Result<()> {
 
     println!("{LOG_PREFIX} Generating openvm assets");
     let force_overwrite = matches!(cli.mode, OutputMode::Force);
-    generate_openvm_assets(&workspace_dir, &release_output_dir, force_overwrite)?;
+    generate_openvm_assets(
+        &workspace_dir,
+        &release_output_dir,
+        force_overwrite,
+        cli.skip_halo2_verifier,
+    )?;
 
     println!("{LOG_PREFIX} Generating app assets (always overwrite)");
     generate_app_assets(&workspace_dir, &release_output_dir)?;
