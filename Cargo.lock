@@ -8679,6 +8679,7 @@ version = "0.7.1"
 dependencies = [
  "alloy-primitives",
  "c-kzg",
+ "eyre",
  "halo2curves-axiom 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.14.0",
  "openvm",

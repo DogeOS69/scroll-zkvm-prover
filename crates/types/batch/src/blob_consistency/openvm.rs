@@ -1,56 +1,24 @@
-use std::ops::{AddAssign, MulAssign};
 use std::slice;
-use std::sync::LazyLock;
 
 use algebra::{Field, IntMod};
 use alloy_primitives::{U256, hex};
-use halo2curves_axiom::bls12_381::G2Affine as Bls12_381_G2;
 use itertools::Itertools;
 use openvm_ecc_guest::{AffinePoint, CyclicGroup, msm, weierstrass::WeierstrassPoint};
 use openvm_pairing::bls12_381::{Bls12_381, Fp, G1Affine, G2Affine, Scalar};
 use openvm_pairing_guest::{algebra, pairing::PairingCheck};
 
-use super::types::ToIntrinsic;
-use crate::blob_consistency::constants::KZG_G2_SETUP_BYTES;
+use super::BLOB_WIDTH;
 
-use super::{BLOB_WIDTH, LOG_BLOB_WIDTH};
+static BLS_MODULUS: U256 = U256::from_limbs([
+    18446744069414584321,
+    6034159408538082302,
+    3691218898639771653,
+    8353516859464449352,
+]);
 
-static BLS_MODULUS: LazyLock<U256> = LazyLock::new(|| U256::from_le_bytes(Scalar::MODULUS));
-
-static ROOTS_OF_UNITY: LazyLock<Vec<Scalar>> = LazyLock::new(|| {
-    // https://github.com/ethereum/consensus-specs/blob/dev/specs/deneb/polynomial-commitments.md#constants
-    let primitive_root_of_unity = Scalar::from_u8(7);
-    let modulus = *BLS_MODULUS;
-
-    let exponent = (modulus - U256::from(1)) / U256::from(4096);
-    let root_of_unity = pow_bytes(&primitive_root_of_unity, &exponent.to_be_bytes::<32>());
-
-    let mut ascending_order: Vec<Scalar> = Vec::new();
-    ascending_order.resize(BLOB_WIDTH, <Scalar as IntMod>::ZERO);
-    ascending_order[0] = <Scalar as IntMod>::ONE; // First element should be 1
-
-    for i in 1..BLOB_WIDTH {
-        let (left, right) = ascending_order.split_at_mut(i);
-        right[0].add_assign(&left[left.len() - 1]);
-        right[0].mul_assign(&root_of_unity);
-    }
-
-    (0..BLOB_WIDTH)
-        .map(|i| {
-            let j = u16::try_from(i).unwrap().reverse_bits() >> (16 - LOG_BLOB_WIDTH);
-            ascending_order[usize::from(j)].clone()
-        })
-        .collect()
-});
-
-static G2_GENERATOR: LazyLock<G2Affine> =
-    LazyLock::new(|| Bls12_381_G2::generator().to_intrinsic());
-
-static KZG_G2_SETUP: LazyLock<G2Affine> = LazyLock::new(|| {
-    Bls12_381_G2::from_uncompressed_unchecked_be(&KZG_G2_SETUP_BYTES)
-        .expect("kzg G2 setup bytes")
-        .to_intrinsic()
-});
+include!(concat!(env!("OUT_DIR"), "/kzg/roots_of_unity.rs"));
+include!(concat!(env!("OUT_DIR"), "/kzg/g2_generator.rs"));
+include!(concat!(env!("OUT_DIR"), "/kzg/kzg_g2_setup.rs"));
 
 // Nontrivial BLS12-381 Fp cube root of unity used by the G1 endomorphism;
 // bytes are little-endian.
@@ -100,7 +68,7 @@ pub fn point_evaluation(
     let coefficients_as_scalars =
         coefficients.map(|coeff| Scalar::from_le_bytes_unchecked(coeff.as_le_slice()));
 
-    let challenge = challenge_digest % *BLS_MODULUS;
+    let challenge = challenge_digest % BLS_MODULUS;
     let challenge = Scalar::from_le_bytes_unchecked(challenge.as_le_slice());
 
     // y = P(z)
@@ -166,9 +134,12 @@ pub fn is_in_g1_subgroup(p: &G1Affine) -> bool {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::ops::{AddAssign, MulAssign};
 
-    use halo2curves_axiom::bls12_381::G1Affine as Bls12_381_G1;
+    use super::*;
+    use crate::blob_consistency::{LOG_BLOB_WIDTH, ToIntrinsic};
+
+    use halo2curves_axiom::bls12_381::{G1Affine as Bls12_381_G1, G2Affine as Bls12_381_G2};
 
     #[test]
     fn test_kzg_compute_proof_verify() {
@@ -210,6 +181,56 @@ mod test {
             .to_intrinsic();
         let proof_ok = verify_kzg_proof(z, y, commitment, proof);
         assert!(proof_ok, "verify failed");
+    }
+
+    #[test]
+    fn test_modulus() {
+        assert_eq!(BLS_MODULUS, U256::from_le_bytes(Scalar::MODULUS))
+    }
+
+    #[test]
+    fn test_roots_of_unity() {
+        // https://github.com/ethereum/consensus-specs/blob/master/specs/deneb/polynomial-commitments.md#constants
+        let primitive_root_of_unity = Scalar::from_u8(7);
+        let modulus = BLS_MODULUS;
+
+        let exponent = (modulus - U256::from(1)) / U256::from(4096);
+        let root_of_unity = pow_bytes(&primitive_root_of_unity, &exponent.to_be_bytes::<32>());
+
+        let mut ascending_order: Vec<Scalar> = Vec::new();
+        ascending_order.resize(BLOB_WIDTH, <Scalar as IntMod>::ZERO);
+        ascending_order[0] = <Scalar as IntMod>::ONE; // First element should be 1
+
+        for i in 1..BLOB_WIDTH {
+            let (left, right) = ascending_order.split_at_mut(i);
+            right[0].add_assign(&left[left.len() - 1]);
+            right[0].mul_assign(&root_of_unity);
+        }
+
+        let roots_of_unity: Vec<_> = (0..BLOB_WIDTH)
+            .map(|i| {
+                let j = u16::try_from(i).unwrap().reverse_bits() >> (16 - LOG_BLOB_WIDTH);
+                ascending_order[usize::from(j)].clone()
+            })
+            .collect();
+
+        assert_eq!(roots_of_unity, ROOTS_OF_UNITY);
+    }
+
+    #[test]
+    fn test_kzg_g2_setup() {
+        // Use the second G2 field in kzg setup (G2[1]),
+        // extracted from https://github.com/ethereum/c-kzg-4844/blob/81a8949f29d27d225ca74ebb4e9061bdd100560a/src/trusted_setup.txt#L4100
+        const KZG_G2_SETUP_BYTES_COMPRESSED: [u8; 96] = hex!(
+            "b5bfd7dd8cdeb128843bc287230af38926187075cbfbefa81009a2ce615ac53d2914e5870cb452d2afaaab24f3499f72185cbfee53492714734429b7b38608e23926c911cceceac9a36851477ba4c60b087041de621000edc98edada20c1def2"
+        );
+        let p = Bls12_381_G2::from_compressed_be(&KZG_G2_SETUP_BYTES_COMPRESSED).unwrap();
+        assert_eq!(p.to_intrinsic(), KZG_G2_SETUP)
+    }
+
+    #[test]
+    fn test_g2_generator() {
+        assert_eq!(Bls12_381_G2::generator().to_intrinsic(), G2_GENERATOR);
     }
 
     /// BETA is a nontrivial cube root of unity mod p
