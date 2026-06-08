@@ -8687,6 +8687,7 @@ dependencies = [
  "openvm-pairing",
  "openvm-pairing-guest",
  "openvm-sha2",
+ "rand 0.9.2",
  "sbv-primitives",
  "scroll-zkvm-types-base",
  "serde",
