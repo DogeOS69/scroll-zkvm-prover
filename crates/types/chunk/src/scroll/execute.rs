@@ -43,6 +43,7 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         pre_state_root,
         post_state_root,
         withdraw_root,
+        next_message_index,
         ..
     } = verifier::run(&witness.blocks, chain_spec, witness.compression_infos)
         .map_err(|e| format!("verify error: {e}"))?;
@@ -68,6 +69,7 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         post_state_root,
         data_hash,
         withdraw_root,
+        next_message_index,
         tx_data_digest,
         tx_data_length: tx_data_length as u64,
         initial_block_number: blocks[0].header().number,

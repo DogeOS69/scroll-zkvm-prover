@@ -7752,7 +7752,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "sbv-core"
 version = "2.0.0"
-source = "git+https://github.com/scroll-tech/stateless-block-verifier?tag=scroll-v91.2#3a32848c9438432125751eae8837757f6b87562e"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=69e5dd4465120c67bf071f65d178e9334eb9813b#69e5dd4465120c67bf071f65d178e9334eb9813b"
 dependencies = [
  "auto_impl",
  "itertools 0.14.0",
@@ -7768,7 +7768,7 @@ dependencies = [
 [[package]]
 name = "sbv-helpers"
 version = "2.0.0"
-source = "git+https://github.com/scroll-tech/stateless-block-verifier?tag=scroll-v91.2#3a32848c9438432125751eae8837757f6b87562e"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=69e5dd4465120c67bf071f65d178e9334eb9813b#69e5dd4465120c67bf071f65d178e9334eb9813b"
 dependencies = [
  "tracing",
 ]
@@ -7776,7 +7776,7 @@ dependencies = [
 [[package]]
 name = "sbv-primitives"
 version = "2.0.0"
-source = "git+https://github.com/scroll-tech/stateless-block-verifier?tag=scroll-v91.2#3a32848c9438432125751eae8837757f6b87562e"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=69e5dd4465120c67bf071f65d178e9334eb9813b#69e5dd4465120c67bf071f65d178e9334eb9813b"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 1.1.1",
@@ -7810,7 +7810,7 @@ dependencies = [
 [[package]]
 name = "sbv-trie"
 version = "2.0.0"
-source = "git+https://github.com/scroll-tech/stateless-block-verifier?tag=scroll-v91.2#3a32848c9438432125751eae8837757f6b87562e"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=69e5dd4465120c67bf071f65d178e9334eb9813b#69e5dd4465120c67bf071f65d178e9334eb9813b"
 dependencies = [
  "alloy-rlp",
  "alloy-trie 0.9.1",
@@ -7823,7 +7823,7 @@ dependencies = [
 [[package]]
 name = "sbv-utils"
 version = "2.0.0"
-source = "git+https://github.com/scroll-tech/stateless-block-verifier?tag=scroll-v91.2#3a32848c9438432125751eae8837757f6b87562e"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=69e5dd4465120c67bf071f65d178e9334eb9813b#69e5dd4465120c67bf071f65d178e9334eb9813b"
 dependencies = [
  "alloy-provider",
  "alloy-transport",
@@ -8122,6 +8122,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-serde 1.1.1",
  "serde",
+ "serde_json",
  "sha2 0.10.9",
  "sha3",
 ]

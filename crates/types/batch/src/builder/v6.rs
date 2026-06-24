@@ -51,6 +51,7 @@ impl super::BatchInfoBuilder for BatchInfoBuilderV6 {
             batch_hash: args.header.batch_hash(),
             chain_id: last.chain_id,
             withdraw_root: last.withdraw_root,
+            next_message_index: last.next_message_index,
             prev_msg_queue_hash: Default::default(),
             post_msg_queue_hash: Default::default(),
             encryption_key: Default::default(),

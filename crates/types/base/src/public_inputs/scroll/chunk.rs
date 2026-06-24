@@ -68,6 +68,8 @@ pub struct ChunkInfo {
     pub post_state_root: B256,
     /// The withdrawals root after applying the chunk.
     pub withdraw_root: B256,
+    /// The next message index after applying the chunk.
+    pub next_message_index: u64,
     /// Digest of L1 message txs force included in the chunk.
     /// It is a legacy field and can be omitted in new defination
     #[serde(default)]
@@ -104,6 +106,7 @@ impl std::fmt::Display for ChunkInfo {
                     .field("prev_state_root", &self.0.prev_state_root)
                     .field("post_state_root", &self.0.post_state_root)
                     .field("withdraw_root", &self.0.withdraw_root)
+                    .field("next_message_index", &self.0.next_message_index)
                     .field("data_hash", &self.0.data_hash)
                     .field("tx_data_digest", &self.0.tx_data_digest)
                     .field("prev_msg_queue_hash", &self.0.prev_msg_queue_hash)
@@ -220,11 +223,42 @@ impl ChunkInfo {
             .collect()
     }
 
-    /// Public inputs encoded for a given chunk (galileo or da-codec@v9) is defined as
+    /// Public inputs encoded for a given chunk for Scroll@v10 (GalileoV2) is defined as
     ///
-    /// The same as galileo.
+    /// concat(
+    ///     version ||
+    ///     chain id ||
+    ///     prev state root ||
+    ///     post state root ||
+    ///     withdraw root ||
+    ///     next message index ||
+    ///     tx data digest ||
+    ///     prev msg queue hash ||
+    ///     post msg queue hash ||
+    ///     initial block number ||
+    ///     block_ctx for block_ctx in block_ctxs
+    /// )
     pub fn pi_galileo_v2(&self, version: Version) -> Vec<u8> {
-        self.pi_galileo(version)
+        std::iter::empty()
+            .chain(&[version.as_version_byte()])
+            .chain(&self.chain_id.to_be_bytes())
+            .chain(self.prev_state_root.as_slice())
+            .chain(self.post_state_root.as_slice())
+            .chain(self.withdraw_root.as_slice())
+            .chain(&self.next_message_index.to_be_bytes())
+            .chain(self.tx_data_digest.as_slice())
+            .chain(self.prev_msg_queue_hash.as_slice())
+            .chain(self.post_msg_queue_hash.as_slice())
+            .chain(&self.initial_block_number.to_be_bytes())
+            .chain(
+                self.block_ctxs
+                    .iter()
+                    .flat_map(|block_ctx| block_ctx.to_bytes())
+                    .collect::<Vec<u8>>()
+                    .as_slice(),
+            )
+            .copied()
+            .collect()
     }
 
     /// Public inputs encoded for a given chunk for L3 validium @ v1:
@@ -245,6 +279,7 @@ impl ChunkInfo {
     ///     encryption key
     /// )
     pub fn pi_validium(&self, version: Version) -> Vec<u8> {
+        // Validium keeps the upstream PI layout and intentionally excludes next_message_index.
         std::iter::empty()
             .chain(&[version.as_version_byte()])
             .chain(&self.chain_id.to_be_bytes())
@@ -303,6 +338,14 @@ impl MultiVersionPublicInputs for ChunkInfo {
         assert_eq!(self.prev_state_root, prev_pi.post_state_root);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
 
+        // Scroll@v10 commits next_message_index into the PI, so it must not regress.
+        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
+            assert!(
+                self.next_message_index >= prev_pi.next_message_index,
+                "next_message_index must not regress"
+            );
+        }
+
         // message queue hash is used only after euclidv2 (da-codec@v7)
         if version.fork == ForkName::EuclidV1 {
             assert_eq!(self.prev_msg_queue_hash, B256::ZERO);
@@ -318,5 +361,105 @@ impl MultiVersionPublicInputs for ChunkInfo {
             assert!(self.encryption_key.is_some());
             assert_eq!(self.encryption_key, prev_pi.encryption_key);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BlockContextV2, ChunkInfo};
+    use crate::{
+        public_inputs::{MultiVersionPublicInputs, Version},
+        version::Domain,
+    };
+    use alloy_primitives::{B256, U256};
+
+    fn sample_chunk_info(next_message_index: u64) -> ChunkInfo {
+        ChunkInfo {
+            chain_id: 534352,
+            prev_state_root: B256::repeat_byte(0x11),
+            post_state_root: B256::repeat_byte(0x22),
+            withdraw_root: B256::repeat_byte(0x33),
+            next_message_index,
+            data_hash: B256::repeat_byte(0x44),
+            tx_data_digest: B256::repeat_byte(0x55),
+            prev_msg_queue_hash: B256::repeat_byte(0x66),
+            post_msg_queue_hash: B256::repeat_byte(0x77),
+            tx_data_length: 123,
+            initial_block_number: 456,
+            block_ctxs: vec![BlockContextV2 {
+                timestamp: 789,
+                base_fee: U256::from(321u64),
+                gas_limit: 654,
+                num_txs: 3,
+                num_l1_msgs: 1,
+            }],
+            prev_blockhash: B256::repeat_byte(0x88),
+            post_blockhash: B256::repeat_byte(0x99),
+            encryption_key: None,
+        }
+    }
+
+    fn next_contiguous_chunk(prev: &ChunkInfo, next_message_index: u64) -> ChunkInfo {
+        ChunkInfo {
+            prev_state_root: prev.post_state_root,
+            prev_msg_queue_hash: prev.post_msg_queue_hash,
+            ..sample_chunk_info(next_message_index)
+        }
+    }
+
+    fn panic_message(err: Box<dyn std::any::Any + Send>) -> String {
+        match err.downcast::<String>() {
+            Ok(msg) => *msg,
+            Err(err) => match err.downcast::<&'static str>() {
+                Ok(msg) => (*msg).to_string(),
+                Err(_) => panic!("unexpected non-string panic payload"),
+            },
+        }
+    }
+
+    #[test]
+    fn chunk_json_requires_next_message_index() {
+        let mut value = serde_json::to_value(sample_chunk_info(42)).unwrap();
+        value
+            .as_object_mut()
+            .expect("chunk info object")
+            .remove("next_message_index");
+
+        let err = serde_json::from_value::<ChunkInfo>(value)
+            .expect_err("chunk info must require next_message_index");
+        assert!(err.to_string().contains("next_message_index"));
+    }
+
+    #[test]
+    fn galileov2_chunk_pi_layout_commits_next_message_index() {
+        let pi = sample_chunk_info(0x0102_0304_0506_0708).pi_galileo_v2(Version::galileo_v2());
+
+        assert_eq!(pi.len(), 269);
+        assert_eq!(pi[0], Version::galileo_v2().as_version_byte());
+        assert_eq!(&pi[105..113], &0x0102_0304_0506_0708u64.to_be_bytes());
+        assert_eq!(&pi[113..145], B256::repeat_byte(0x55).as_slice());
+    }
+
+    #[test]
+    fn galileov2_chunk_validate_reports_regression() {
+        let version = Version::galileo_v2();
+        let prev = sample_chunk_info(22);
+        let current = next_contiguous_chunk(&prev, 21);
+
+        let err = std::panic::catch_unwind(|| current.validate(&prev, version))
+            .expect_err("v10 validation must reject regressions");
+
+        let message = panic_message(err);
+        assert!(message.contains("next_message_index must not regress"));
+    }
+
+    #[test]
+    fn pre_v10_chunk_validate_ignores_next_message_index_regression() {
+        let version = Version::galileo();
+        assert_eq!(version.domain, Domain::Scroll);
+
+        let prev = sample_chunk_info(22);
+        let current = next_contiguous_chunk(&prev, 21);
+        current.validate(&prev, version);
     }
 }
