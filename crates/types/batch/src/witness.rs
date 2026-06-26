@@ -75,7 +75,7 @@ pub fn build_intrinsic_point(
     use openvm_pairing::bls12_381::{Fp, G1Affine};
     let x = Fp::from_be_bytes(&x)?;
     let y = Fp::from_be_bytes(&y)?;
-    let p = G1Affine::from_xy(x, y)?;
+    let p = unsafe { G1Affine::from_xy(x, y) }?;
     is_in_g1_subgroup(&p).then_some(p)
 }
 

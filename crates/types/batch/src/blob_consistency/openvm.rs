@@ -38,11 +38,14 @@ const VERSIONED_HASH_VERSION_KZG: u8 = 1;
 ///
 /// We use [`openvm_pairing_guest`] extension to implement this in guest program.
 pub fn verify_kzg_proof(z: Scalar, y: Scalar, commitment: G1Affine, proof: G1Affine) -> bool {
-    let proof_q = G1Affine::from_xy_nonidentity(proof.x().clone(), proof.y().clone())
-        .expect("kzg proof not G1 identity");
-    let p_minus_y = G1Affine::from_xy_nonidentity(commitment.x().clone(), commitment.y().clone())
-        .expect("kzg commitment not G1 identity")
-        - msm(&[y], std::slice::from_ref(&G1Affine::GENERATOR));
+    let proof_q = unsafe {
+        G1Affine::from_xy_nonidentity(proof.x().clone(), proof.y().clone())
+            .expect("kzg proof not G1 identity")
+    };
+    let p_minus_y = unsafe {
+        G1Affine::from_xy_nonidentity(commitment.x().clone(), commitment.y().clone())
+            .expect("kzg commitment not G1 identity")
+    } - msm(&[y], std::slice::from_ref(&G1Affine::GENERATOR));
     let g2_generator: &G2Affine = &G2_GENERATOR;
     let x_minus_z = msm(&[z], std::slice::from_ref(g2_generator)) - KZG_G2_SETUP.clone();
 
@@ -183,6 +186,38 @@ mod test {
         assert!(proof_ok, "verify failed");
     }
 
+    /// BETA is a nontrivial cube root of unity mod p
+    #[test]
+    fn test_beta() {
+        use halo2curves_axiom::bls12_381::Fq;
+        let beta = Fq::from_bytes_be(&BETA.to_be_bytes()).unwrap();
+
+        // BETA != 1
+        assert_ne!(beta, Fq::one(), "BETA != 1");
+        // BETA^3 mod p == 1
+        let beta_cubed = &beta * &beta * &beta;
+        assert_eq!(beta_cubed, Fq::one(), "BETA^3 == 1");
+        // BETA^2 + BETA + 1 mod p == 0
+        assert_eq!(
+            &beta * &beta + beta + Fq::one(),
+            Fq::zero(),
+            "BETA^2 + BETA + 1 == 0"
+        );
+    }
+
+    #[test]
+    fn test_x_square() {
+        use halo2curves_axiom::bls12_381::BLS_X;
+        let x = -Scalar::from_u64(BLS_X);
+        let x_square = &x * &x;
+        assert_eq!(x_square, X_SQUARE);
+    }
+
+    #[test]
+    fn test_g1_generator_is_in_subgroup() {
+        assert!(is_in_g1_subgroup(&G1Affine::GENERATOR));
+    }
+
     #[test]
     fn test_modulus() {
         assert_eq!(BLS_MODULUS, U256::from_le_bytes(Scalar::MODULUS))
@@ -231,38 +266,6 @@ mod test {
     #[test]
     fn test_g2_generator() {
         assert_eq!(Bls12_381_G2::generator().to_intrinsic(), G2_GENERATOR);
-    }
-
-    /// BETA is a nontrivial cube root of unity mod p
-    #[test]
-    fn test_beta() {
-        use halo2curves_axiom::bls12_381::Fq;
-        let beta = Fq::from_bytes_be(&BETA.to_be_bytes()).unwrap();
-
-        // BETA != 1
-        assert_ne!(beta, Fq::one(), "BETA != 1");
-        // BETA^3 mod p == 1
-        let beta_cubed = &beta * &beta * &beta;
-        assert_eq!(beta_cubed, Fq::one(), "BETA^3 == 1");
-        // BETA^2 + BETA + 1 mod p == 0
-        assert_eq!(
-            &beta * &beta + beta + Fq::one(),
-            Fq::zero(),
-            "BETA^2 + BETA + 1 == 0"
-        );
-    }
-
-    #[test]
-    fn test_x_square() {
-        use halo2curves_axiom::bls12_381::BLS_X;
-        let x = -Scalar::from_u64(BLS_X);
-        let x_square = &x * &x;
-        assert_eq!(x_square, X_SQUARE);
-    }
-
-    #[test]
-    fn test_g1_generator_is_in_subgroup() {
-        assert!(is_in_g1_subgroup(&G1Affine::GENERATOR));
     }
 
     #[test]

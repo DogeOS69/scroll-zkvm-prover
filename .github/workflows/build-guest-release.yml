@@ -39,7 +39,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build guest binary
-        run: make build-guest 
+        run: make build-guest
         
       - name: Prepare release
         run: sh release.sh
