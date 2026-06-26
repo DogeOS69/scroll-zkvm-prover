@@ -127,6 +127,7 @@ impl<P: Payload> super::BatchInfoBuilder for GenericBatchInfoBuilderV7<P> {
             batch_hash: args.header.batch_hash(),
             chain_id: last_chunk.chain_id,
             withdraw_root: last_chunk.withdraw_root,
+            next_message_index: last_chunk.next_message_index,
             prev_msg_queue_hash: first_chunk.prev_msg_queue_hash,
             post_msg_queue_hash: last_chunk.post_msg_queue_hash,
             encryption_key: None,
