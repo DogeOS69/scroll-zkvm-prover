@@ -58,6 +58,8 @@ pub enum STFVersion {
     V9 = 9,
     /// Scroll@v10.
     V10 = 10,
+    /// Dogeos@v11.
+    V11 = 11,
 }
 
 impl From<u8> for STFVersion {
@@ -69,6 +71,7 @@ impl From<u8> for STFVersion {
             8 => Self::V8,
             9 => Self::V9,
             10 => Self::V10,
+            11 => Self::V11,
             value => unreachable!("unsupported stf-version={value}"),
         }
     }
@@ -176,6 +179,15 @@ impl Version {
 
     pub fn is_validium(&self) -> bool {
         self.domain == Domain::Validium
+    }
+
+    pub const fn tsuki() -> Self {
+        Self {
+            domain: Domain::Scroll,
+            stf_version: STFVersion::V11,
+            fork: ForkName::Tsuki,
+            codec: Codec::V7,
+        }
     }
 
     pub fn codec(&self) -> u8 {

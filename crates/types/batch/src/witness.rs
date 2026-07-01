@@ -135,7 +135,7 @@ impl From<&BatchWitness> for BatchInfo {
                 };
                 BatchInfoBuilderV6::build(witness.version, args)
             }
-            ReferenceHeader::V7_V8_V9(header) => {
+            ReferenceHeader::V7_V8_V9_V10(header) => {
                 let point_eval_witness = witness
                     .point_eval_witness
                     .as_ref()

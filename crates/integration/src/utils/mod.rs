@@ -70,7 +70,7 @@ impl From<&ReferenceHeader> for LastHeader {
     fn from(value: &ReferenceHeader) -> Self {
         match value {
             ReferenceHeader::V6(h) => h.into(),
-            ReferenceHeader::V7_V8_V9(h) => h.into(),
+            ReferenceHeader::V7_V8_V9_V10(h) => h.into(),
             ReferenceHeader::V8(_) => {
                 unreachable!("Unexpected ReferenceHeader::V8 from 0.7.0 onwards")
             }
@@ -299,9 +299,13 @@ pub fn build_batch_witnesses(
                 blob_data_proof: point_evaluations.map(|u| B256::new(u.to_be_bytes())),
             })
         }
-        ForkName::EuclidV2 | ForkName::Feynman | ForkName::Galileo | ForkName::GalileoV2 => {
+        ForkName::EuclidV2
+        | ForkName::Feynman
+        | ForkName::Galileo
+        | ForkName::GalileoV2
+        | ForkName::Tsuki => {
             use scroll_zkvm_types::scroll::batch::BatchHeaderV7;
-            ReferenceHeader::V7_V8_V9(BatchHeaderV7 {
+            ReferenceHeader::V7_V8_V9_V10(BatchHeaderV7 {
                 version: last_header.version,
                 batch_index: last_header.batch_index + 1,
                 parent_batch_hash: last_header.batch_hash,
@@ -454,7 +458,7 @@ fn test_build_and_parse_batch_task() -> eyre::Result<()> {
             let enveloped = batch::EnvelopeV6::from_slice(&task_wit.blob_bytes);
             <batch::PayloadV6 as Payload>::from_envelope(&enveloped).validate(h, infos);
         }
-        ReferenceHeader::V7_V8_V9(h) => {
+        ReferenceHeader::V7_V8_V9_V10(h) => {
             let enveloped = batch::EnvelopeV7::from_slice(&task_wit.blob_bytes);
             <batch::PayloadV7 as Payload>::from_envelope(&enveloped).validate(h, infos);
         }

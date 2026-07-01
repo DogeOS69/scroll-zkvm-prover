@@ -20,6 +20,7 @@ pub enum ForkName {
     Feynman,
     Galileo,
     GalileoV2,
+    Tsuki,
 }
 
 impl fmt::Display for ForkName {
@@ -30,6 +31,7 @@ impl fmt::Display for ForkName {
             ForkName::Feynman => "feynman",
             ForkName::Galileo => "galileo",
             ForkName::GalileoV2 => "galileov2",
+            ForkName::Tsuki => "tsuki",
         };
         write!(f, "{}", s)
     }
@@ -44,6 +46,7 @@ impl ForkName {
             ForkName::Feynman => "feynman",
             ForkName::Galileo => "galileo",
             ForkName::GalileoV2 => "galileov2",
+            ForkName::Tsuki => "tsuki",
         }
     }
 }
@@ -57,6 +60,7 @@ impl From<Option<&str>> for ForkName {
             Some("feynman") => ForkName::Feynman,
             Some("galileo") => ForkName::Galileo,
             Some("galileov2") => ForkName::GalileoV2,
+            Some("tsuki") => ForkName::Tsuki,
             Some(s) => unreachable!("hardfork not accepted: {s}"),
         }
     }
@@ -70,6 +74,7 @@ impl From<&str> for ForkName {
             "feynman" => ForkName::Feynman,
             "galileo" => ForkName::Galileo,
             "galileov2" => ForkName::GalileoV2,
+            "tsuki" => ForkName::Tsuki,
             s => unreachable!("hardfork not accepted: {s}"),
         }
     }
