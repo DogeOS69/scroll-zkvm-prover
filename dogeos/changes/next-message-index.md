@@ -10,8 +10,9 @@ This overlay threads Scroll's `nextMessageIndex` from
 - Patch all five `sbv-*` crates to the DogeOS SBV fork at one immutable `rev`.
 - Extend `ChunkInfo` and `BatchInfo` with `next_message_index`.
 - Require `next_message_index` in serialized chunk and batch metadata.
-- Append the value only in `galileo_v2` / `Scroll@v10` public input encodings.
-- Leave older PI versions and bundle behavior unchanged.
+- Append the value only in `tsuki` / `Scroll@v11` chunk and batch public input encodings.
+- Keep Scroll v10 / GalileoV2 public inputs compatible with upstream Scroll.
+- Leave older PI versions, Validium PI versions, and bundle behavior unchanged.
 
 ## Why this stays maintainable
 

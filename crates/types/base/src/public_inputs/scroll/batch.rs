@@ -21,7 +21,6 @@ pub struct BatchInfo {
     /// The withdraw root of the last block in the last chunk in the batch.
     pub withdraw_root: B256,
     /// The next message index of the last block in the last chunk in the batch.
-    #[serde(default)]
     pub next_message_index: u64,
     /// The L1 msg queue hash at the end of the previous batch.
     pub prev_msg_queue_hash: B256,

@@ -417,29 +417,24 @@ pub fn build_batch_witnesses_validium(
 #[test]
 fn test_build_and_parse_batch_task() -> eyre::Result<()> {
     use crate::testers::chunk::ChunkTaskGenerator;
-    use scroll_zkvm_types::scroll::batch::{self, Envelope, Payload};
+    use scroll_zkvm_types::{
+        public_inputs::Version,
+        scroll::batch::{self, Envelope, Payload},
+    };
 
-    let witness = match testing_hardfork() {
-        ForkName::EuclidV2 => ChunkTaskGenerator {
-            block_range: (1..=4).collect(),
-            ..Default::default()
-        },
-        ForkName::EuclidV1 => ChunkTaskGenerator {
-            block_range: (12508460..=12508463).collect(),
-            ..Default::default()
-        },
-        ForkName::Feynman => ChunkTaskGenerator {
-            block_range: (16525000..=16525003).collect(),
-            ..Default::default()
-        },
-        ForkName::Galileo => ChunkTaskGenerator {
-            block_range: (20239156..=20239192).collect(),
-            ..Default::default()
-        },
-        ForkName::GalileoV2 => ChunkTaskGenerator {
-            block_range: (20239240..=20239245).collect(),
-            ..Default::default()
-        },
+    let (version, block_range) = match testing_hardfork() {
+        ForkName::EuclidV2 => (Version::euclid_v2(), 1u64..=4),
+        ForkName::EuclidV1 => (Version::euclid_v1(), 12508460u64..=12508463),
+        ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003),
+        ForkName::Galileo => (Version::galileo(), 20239156u64..=20239192),
+        ForkName::GalileoV2 => (Version::galileo_v2(), 20239240u64..=20239245),
+        // Dedicated Tsuki fixtures are not checked in yet; reuse the GalileoV2 fixture window.
+        ForkName::Tsuki => (Version::tsuki(), 20239240u64..=20239245),
+    };
+    let witness = ChunkTaskGenerator {
+        version,
+        block_range: block_range.collect(),
+        ..Default::default()
     }
     .get_or_build_witness()?;
 

@@ -113,6 +113,15 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
                 20239244..=20239245,
             ],
         ),
+        ForkName::Tsuki => (
+            Version::tsuki(),
+            // Dedicated Tsuki fixtures are not checked in yet; reuse the GalileoV2 fixture window.
+            vec![
+                20239240..=20239241,
+                20239242..=20239243,
+                20239244..=20239245,
+            ],
+        ),
     };
     let outcome_2 = create_canonical_tasks(version, block_range.into_iter())?;
 
