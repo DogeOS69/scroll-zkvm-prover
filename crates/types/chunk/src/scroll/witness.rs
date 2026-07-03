@@ -1,8 +1,8 @@
 use super::types::validium::SecretKey;
 use alloy_primitives::B256;
 use sbv_core::witness::BlockWitness;
+use sbv_primitives::U256;
 use sbv_primitives::types::consensus::TxL1Message;
-use sbv_primitives::types::evm::ScrollTxCompressionInfos;
 use std::collections::HashSet;
 use types_base::version::Version;
 use types_base::{fork_name::ForkName, public_inputs::scroll::chunk::ChunkInfo};
@@ -19,7 +19,7 @@ pub struct ChunkWitness {
     /// The code version specify the chain spec
     pub fork_name: ForkName,
     /// The compression info for each block in the chunk.
-    pub compression_infos: Vec<ScrollTxCompressionInfos>,
+    pub compression_infos: Vec<Vec<(U256, usize)>>,
     /// Validium encrypted txs and secret key if this is a validium chain.
     pub validium: Option<ValidiumInputs>,
 }

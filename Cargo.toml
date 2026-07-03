@@ -68,23 +68,23 @@ openvm-transpiler = { git = "https://github.com/openvm-org/openvm.git", tag = "v
 # more openvm related libs
 openvm-stark-sdk = { git = "https://github.com/openvm-org/stark-backend.git", tag = "v1.4.0", default-features = false }
 
-sbv-core = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2" }
-sbv-helpers = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2", features = ["dev"] }
-sbv-primitives = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2" }
-sbv-utils = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2" }
-sbv-trie = { git = "https://github.com/scroll-tech/stateless-block-verifier", tag = "scroll-v91.2" }
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b4952b48ceceaf92ca3100d5ee6301a7f6b7cc9a" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b4952b48ceceaf92ca3100d5ee6301a7f6b7cc9a", features = ["dev"] }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b4952b48ceceaf92ca3100d5ee6301a7f6b7cc9a" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b4952b48ceceaf92ca3100d5ee6301a7f6b7cc9a" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "b4952b48ceceaf92ca3100d5ee6301a7f6b7cc9a" }
 
-alloy-consensus = "1.0"
-alloy-provider = "1.0"
-alloy-rpc-client = "1.0"
-alloy-transport = "1.0"
-alloy-primitives = { version = "1.4", default-features = false, features = [
+alloy-consensus = "2.1.0"
+alloy-provider = "2.1.0"
+alloy-rpc-client = "2.1.0"
+alloy-transport = "2.1.0"
+alloy-primitives = { version = "1.6.0", default-features = false, features = [
   "std",
   "map-hashbrown",
   "map-fxhash",
 ] }
-alloy-serde = { version = "1.0.13", default-features = false }
-alloy-sol-types = { version = "1.3", default-features = false }
+alloy-serde = { version = "2.1.0", default-features = false }
+alloy-sol-types = { version = "1.6.0", default-features = false }
 bitcode = { version = "0.6.5", default-features = false, features = [
   "serde",
   "derive",
@@ -108,7 +108,7 @@ metrics = "0.23.0"
 metrics-util = "0.17"
 metrics-tracing-context = "0.16.0"
 rayon = "1.10"
-revm = "29"
+revm = "41.0.0"
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0" }
 serde_with = "3.11.0"
@@ -142,26 +142,26 @@ scroll-zkvm-integration = { path = "crates/integration" }
 scroll-zkvm-prover = { path = "crates/prover" }
 scroll-zkvm-verifier = { path = "crates/verifier" }
 
-[patch."https://github.com/scroll-tech/stateless-block-verifier"]
-sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
-sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
-sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
-sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
-sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "69e5dd4465120c67bf071f65d178e9334eb9813b" }
+[patch."https://github.com/scroll-tech/reth"]
+reth-chainspec = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-evm = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-evm-ethereum = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-ethereum-forks = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-execution-types = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-primitives = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-primitives-traits = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-stateless = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-trie = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
 
-[patch.crates-io]
-revm = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-bytecode = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-context = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-context-interface = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-database = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-database-interface = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-handler = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-inspector = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-interpreter = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-precompile = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-primitives = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
-revm-state = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91" }
+reth-scroll-chainspec = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-scroll-evm = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-scroll-forks = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+reth-scroll-primitives = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+
+scroll-alloy-consensus = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+scroll-alloy-evm = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+scroll-alloy-network = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
+scroll-alloy-rpc-types = { git = "https://github.com/DogeOS69/dogeos-reth", rev = "964ef6eb6ae73f1ae3206eb0c6f69dfebec948c0" }
 
 [profile.maxperf]
 inherits = "release"

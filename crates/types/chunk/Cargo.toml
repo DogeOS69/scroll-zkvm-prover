@@ -19,7 +19,6 @@ sbv-core = { workspace = true, features = [] }
 sbv-trie = { workspace = true }
 sbv-primitives = { workspace = true, features = [
   "hardforks",
-  "evm-types",
   "revm-types",
   "reth-evm-types",
 ] }
@@ -46,7 +45,6 @@ default = []
 host = ["scroll-compress-info", "alloy-primitives/tiny-keccak"]
 scroll = [
   "sbv-core/scroll",
-  "sbv-primitives/scroll-evm-types",
   "sbv-primitives/scroll-hardforks",
   "sbv-primitives/scroll-revm-types",
   "sbv-primitives/scroll-reth-evm-types",
