@@ -319,6 +319,9 @@ impl MultiVersionPublicInputs for ChunkInfo {
             (Domain::Scroll, STFVersion::V8) => self.pi_feynman(),
             (Domain::Scroll, STFVersion::V9) => self.pi_galileo(version),
             (Domain::Scroll, STFVersion::V10) => self.pi_galileo_v2(version),
+            // Tsuki (v11) reuses the GalileoV2 chunk PI layout; only the
+            // version byte differs (via `version.as_version_byte()`).
+            (Domain::Scroll, STFVersion::V11) => self.pi_galileo_v2(version),
             (Domain::Validium, STFVersion::V1) => self.pi_validium(version),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
@@ -338,8 +341,12 @@ impl MultiVersionPublicInputs for ChunkInfo {
         assert_eq!(self.prev_state_root, prev_pi.post_state_root);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
 
-        // Scroll@v10 commits next_message_index into the PI, so it must not regress.
-        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
+        // Scroll@v10 and @v11 commit next_message_index into the chunk PI (the
+        // chunk PI layout is unchanged across the Tsuki relocation, unlike the
+        // batch PI), so it must not regress.
+        if version.domain == Domain::Scroll
+            && matches!(version.stf_version, STFVersion::V10 | STFVersion::V11)
+        {
             assert!(
                 self.next_message_index >= prev_pi.next_message_index,
                 "next_message_index must not regress"
