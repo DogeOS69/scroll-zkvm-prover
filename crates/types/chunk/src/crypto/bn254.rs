@@ -244,7 +244,13 @@ pub(super) fn pairing_check(pairs: &[(&[u8], &[u8])]) -> Result<bool, Precompile
 #[cfg(all(test, feature = "scroll", feature = "host"))]
 mod test {
     use super::*;
+    use alloy_primitives::{Address, U256};
     use hex_literal::hex;
+    use sbv_primitives::types::evm::precompiles::{Precompile, PrecompileInput};
+    use sbv_primitives::types::reth::evm::EvmInternals;
+    use sbv_primitives::types::reth::evm::revm::context::CfgEnv;
+    use sbv_primitives::types::reth::evm::revm::{Context, MainContext};
+    use sbv_primitives::types::revm::precompile::PrecompileResult;
     use sbv_primitives::{
         B256,
         types::{reth::evm::revm, revm::precompile::PrecompileOutput},
@@ -277,6 +283,28 @@ mod test {
         assert!(read_g2_point(&G2_POINT_2).is_ok());
     }
 
+    fn call_dyn_precompile(
+        precompile: impl Precompile,
+        address: Address,
+        input: &[u8],
+        gas: u64,
+    ) -> PrecompileResult {
+        let mut ctx = Context::mainnet().with_cfg(CfgEnv::new_with_spec(
+            sbv_primitives::types::revm::SpecId::GALILEO,
+        ));
+
+        precompile.call(PrecompileInput {
+            data: input,
+            gas,
+            caller: Address::ZERO,
+            value: U256::ZERO,
+            is_static: false,
+            internals: EvmInternals::from_context(&mut ctx),
+            target_address: address,
+            bytecode_address: address,
+        })
+    }
+
     #[test]
     fn test_pairing_check_non_matching() {
         // 1. pairing check in zkVM.
@@ -286,16 +314,22 @@ mod test {
         let revm_res = {
             let provider = sbv_primitives::types::revm::ScrollPrecompileProvider::new_with_spec(
                 sbv_primitives::types::revm::SpecId::GALILEO,
-            );
+                None,
+            )
+            .into_precompiles_map();
             let precompile = provider
-                .precompiles()
                 .get(&revm::precompile::bn254::pair::ADDRESS)
                 .expect("should be ok");
             let input = std::iter::empty()
                 .chain(G1_IDENTITY)
                 .chain(G2_NON_SUBGROUP)
                 .collect::<Vec<u8>>();
-            precompile.execute(input.as_slice(), 500_000)
+            call_dyn_precompile(
+                precompile,
+                revm::precompile::bn254::pair::ADDRESS,
+                &input,
+                500_000,
+            )
         };
 
         // G1 is identity element, however G2 is point on curve that is *not* in subgroup.
@@ -318,9 +352,10 @@ mod test {
         let revm_res = {
             let provider = sbv_primitives::types::revm::ScrollPrecompileProvider::new_with_spec(
                 sbv_primitives::types::revm::SpecId::GALILEO,
-            );
+                None,
+            )
+            .into_precompiles_map();
             let precompile = provider
-                .precompiles()
                 .get(&revm::precompile::bn254::pair::ADDRESS)
                 .expect("should be ok");
             let input = std::iter::empty()
@@ -329,7 +364,12 @@ mod test {
                 .chain(G1_POINT_2)
                 .chain(G2_POINT_2)
                 .collect::<Vec<u8>>();
-            precompile.execute(input.as_slice(), 500_000)
+            call_dyn_precompile(
+                precompile,
+                revm::precompile::bn254::pair::ADDRESS,
+                &input,
+                500_000,
+            )
         };
 
         // Here we have both G1 and G2 points valid, i.e. on curve and in the subgroup.
@@ -338,6 +378,7 @@ mod test {
         assert_eq!(zkvm_res.ok(), Some(true));
         let Some(PrecompileOutput {
             gas_used: _gas_used,
+            gas_refunded: _gas_refunded,
             bytes,
             reverted: _reverted,
         }) = revm_res.ok()

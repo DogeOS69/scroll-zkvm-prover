@@ -68,23 +68,23 @@ openvm-transpiler = { git = "https://github.com/openvm-org/openvm.git", tag = "v
 # more openvm related libs
 openvm-stark-sdk = { git = "https://github.com/openvm-org/stark-backend.git", tag = "v1.4.0", default-features = false }
 
-sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "baea300" }
-sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "baea300", features = ["dev"] }
-sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "baea300" }
-sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "baea300" }
-sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "baea300" }
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c9a883a" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c9a883a", features = ["dev"] }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c9a883a" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c9a883a" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c9a883a" }
 
-alloy-consensus = "=1.0.37"
-alloy-provider = "=1.0.37"
-alloy-rpc-client = "=1.0.37"
-alloy-transport = "=1.0.37"
-alloy-primitives = { version = "=1.4.1", default-features = false, features = [
+alloy-consensus = "=1.6.3"
+alloy-provider = "=1.6.3"
+alloy-rpc-client = "=1.6.3"
+alloy-transport = "=1.6.3"
+alloy-primitives = { version = "=1.5.6", default-features = false, features = [
   "std",
   "map-hashbrown",
   "map-fxhash",
 ] }
-alloy-serde = { version = "=1.0.37", default-features = false }
-alloy-sol-types = { version = "=1.4.1", default-features = false }
+alloy-serde = { version = "=1.6.3", default-features = false }
+alloy-sol-types = { version = "=1.5.6", default-features = false }
 bitcode = { version = "0.6.5", default-features = false, features = [
   "serde",
   "derive",
@@ -143,18 +143,18 @@ scroll-zkvm-prover = { path = "crates/prover" }
 scroll-zkvm-verifier = { path = "crates/verifier" }
 
 [patch.crates-io]
-revm = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-bytecode = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-context = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-context-interface = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-database = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-database-interface = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-handler = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-inspector = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-interpreter = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-precompile = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-primitives = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-revm-state = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
+revm = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-bytecode = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-context = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-context-interface = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-database = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-database-interface = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-handler = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-inspector = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-interpreter = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-precompile = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-primitives = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
+revm-state = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
 
 #[patch."https://github.com/DogeOS69/stateless-block-verifier"]
 #sbv-core = { path = "../stateless-block-verifier/crates/core" }

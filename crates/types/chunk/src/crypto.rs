@@ -81,4 +81,15 @@ impl alloy_consensus::crypto::backend::CryptoProvider for Crypto {
             .map(|res| Address::from_slice(&res[12..]))
             .map_err(RecoveryError::from_source)
     }
+
+    #[inline]
+    fn verify_and_compute_signer_unchecked(
+        &self,
+        pubkey: &[u8; 65],
+        sig: &[u8; 64],
+        msg: &[u8; 32],
+    ) -> Result<Address, RecoveryError> {
+        secp256k1::verify_and_compute_signer_unchecked(pubkey, sig, msg)
+            .map_err(RecoveryError::from_source)
+    }
 }

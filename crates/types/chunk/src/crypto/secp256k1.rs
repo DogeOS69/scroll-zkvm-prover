@@ -1,9 +1,11 @@
 //! Copied from <https://github.com/axiom-crypto/revm/blob/v75-openvm/crates/precompile/src/secp256k1/openvm_k256.rs> under MIT license.
 //!
 //! OpenVM implementation of `ecrecover`. More about it in [`crate::secp256k1`].
+
 use openvm_ecc_guest::{algebra::IntMod, weierstrass::WeierstrassPoint};
+use openvm_k256::ecdsa::signature::hazmat::PrehashVerifier;
 use openvm_k256::ecdsa::{Error, RecoveryId, Signature, VerifyingKey};
-use sbv_primitives::{B256, alloy_primitives::B512, keccak256};
+use sbv_primitives::{Address, B256, alloy_primitives::B512, keccak256};
 
 /// Recover the public key from a signature and a message.
 ///
@@ -31,4 +33,28 @@ pub fn ecrecover(sig: &[u8; 64], mut recid: u8, msg: &[u8; 32]) -> Result<[u8; 3
     // truncate to 20 bytes
     hash[..12].fill(0);
     Ok(B256::from(hash).into())
+}
+
+pub(crate) fn verify_and_compute_signer_unchecked(
+    pubkey: &[u8; 65],
+    sig: &[u8; 64],
+    msg: &[u8; 32],
+) -> Result<Address, Error> {
+    let vk = VerifyingKey::from_sec1_bytes(pubkey)?;
+
+    let mut signature = Signature::from_slice(&sig[0..64])?;
+
+    // normalize signature if needed
+    if let Some(sig_normalized) = signature.normalize_s() {
+        signature = sig_normalized;
+    }
+
+    vk.verify_prehash(&msg[..], &signature)?;
+
+    Ok(public_key_to_address(vk))
+}
+
+fn public_key_to_address(public: VerifyingKey) -> Address {
+    let hash = keccak256(&public.to_encoded_point(/* compress = */ false).as_bytes()[1..]);
+    Address::from_slice(&hash[12..])
 }
