@@ -96,9 +96,12 @@ impl BundleInfo {
     }
 
     pub fn pi_galileo_v2(&self) -> Vec<u8> {
-        // GalileoV2 keeps the bundle PI layout unchanged; next_message_index is committed only
-        // at the chunk and batch layers in the DogeOS overlay.
+        // GalileoV2 keeps the bundle PI layout unchanged.
         self.pi_euclidv2()
+    }
+
+    pub fn pi_tsuki(&self) -> Vec<u8> {
+        self.pi_galileo_v2()
     }
 
     pub fn pi_versioned(&self, version: Version, pi: impl IntoIterator<Item = u8>) -> Vec<u8> {
@@ -129,6 +132,7 @@ impl MultiVersionPublicInputs for BundleInfo {
             (Domain::Scroll, STFVersion::V8) => self.pi_versioned(version, self.pi_feynman()),
             (Domain::Scroll, STFVersion::V9) => self.pi_versioned(version, self.pi_galileo()),
             (Domain::Scroll, STFVersion::V10) => self.pi_versioned(version, self.pi_galileo_v2()),
+            (Domain::Scroll, STFVersion::V11) => self.pi_versioned(version, self.pi_tsuki()),
             (Domain::Validium, STFVersion::V1) => self.pi_versioned(version, self.pi_validium_v1()),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
@@ -138,5 +142,37 @@ impl MultiVersionPublicInputs for BundleInfo {
 
     fn validate(&self, _prev_pi: &Self, _version: Version) {
         unreachable!("bundle is the last layer and is not aggregated by any other circuit");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BundleInfo;
+    use crate::public_inputs::{MultiVersionPublicInputs, Version};
+    use alloy_primitives::B256;
+
+    fn sample_bundle_info() -> BundleInfo {
+        BundleInfo {
+            chain_id: 534352,
+            msg_queue_hash: B256::repeat_byte(0x11),
+            num_batches: 12,
+            prev_state_root: B256::repeat_byte(0x22),
+            prev_batch_hash: B256::repeat_byte(0x33),
+            post_state_root: B256::repeat_byte(0x44),
+            batch_hash: B256::repeat_byte(0x55),
+            withdraw_root: B256::repeat_byte(0x66),
+            encryption_key: None,
+        }
+    }
+
+    #[test]
+    fn tsuki_bundle_pi_uses_versioned_galileov2_layout() {
+        let pi = sample_bundle_info().pi_by_version(Version::tsuki());
+
+        assert_eq!(pi.len(), 236);
+        assert_eq!(&pi[..31], &[0u8; 31]);
+        assert_eq!(pi[31], Version::tsuki().as_version_byte());
+        assert_eq!(&pi[32..40], &534352u64.to_be_bytes());
+        assert_eq!(&pi[40..72], B256::repeat_byte(0x11).as_slice());
     }
 }

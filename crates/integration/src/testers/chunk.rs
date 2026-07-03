@@ -1,7 +1,7 @@
 use crate::{
-    PartialProvingTask, ProverTester, TaskProver, prove_verify, testdata_fork_directory,
-    tester_execute, testers::PATH_TESTDATA, testing_hardfork, testing_version,
-    utils::metadata_from_chunk_witnesses,
+    PartialProvingTask, ProverTester, TaskProver, effective_testdata_fork_directory, prove_verify,
+    testdata_fork_directory, tester_execute, testers::PATH_TESTDATA, testing_hardfork,
+    testing_version, utils::metadata_from_chunk_witnesses,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sbv_core::BlockWitness;
@@ -122,7 +122,7 @@ impl ChunkTaskGenerator {
         let dir_name = if self.version.is_validium() {
             "validium"
         } else {
-            self.version.fork.as_str()
+            effective_testdata_fork_directory(self.version.fork)
         };
         let paths: Vec<PathBuf> = self
             .block_range
@@ -204,7 +204,8 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
-        ForkName::Tsuki => todo!("Tsuki preset not implemented yet"),
+        // Reuse the checked-in GalileoV2 fixture window until dedicated Tsuki fixtures land.
+        ForkName::Tsuki => (Version::tsuki(), 20239240..=20239245),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -299,7 +300,15 @@ pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
             ],
             Version::galileo_v2(),
         ),
-        ForkName::Tsuki => todo!("Tsuki preset not implemented yet"),
+        // Reuse the checked-in GalileoV2 fixture window until dedicated Tsuki fixtures land.
+        ForkName::Tsuki => (
+            vec![
+                20239240..=20239240,
+                20239241..=20239241,
+                20239242..=20239242,
+            ],
+            Version::tsuki(),
+        ),
     };
     // If the BLOCK_RANGE env var has been set, use that instead.
     if let Ok(r) = std::env::var("BLOCK_RANGE") {
