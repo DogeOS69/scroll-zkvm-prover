@@ -231,7 +231,6 @@ impl ChunkInfo {
     ///     prev state root ||
     ///     post state root ||
     ///     withdraw root ||
-    ///     next message index ||
     ///     tx data digest ||
     ///     prev msg queue hash ||
     ///     post msg queue hash ||
@@ -239,6 +238,25 @@ impl ChunkInfo {
     ///     block_ctx for block_ctx in block_ctxs
     /// )
     pub fn pi_galileo_v2(&self, version: Version) -> Vec<u8> {
+        self.pi_galileo(version)
+    }
+
+    /// Public inputs encoded for a given chunk for Scroll@v11 (Tsuki) is defined as
+    ///
+    /// concat(
+    ///     version ||
+    ///     chain id ||
+    ///     prev state root ||
+    ///     post state root ||
+    ///     withdraw root ||
+    ///     next message index ||
+    ///     tx data digest ||
+    ///     prev msg queue hash ||
+    ///     post msg queue hash ||
+    ///     initial block number ||
+    ///     block_ctx for block_ctx in block_ctxs
+    /// )
+    pub fn pi_tsuki(&self, version: Version) -> Vec<u8> {
         std::iter::empty()
             .chain(&[version.as_version_byte()])
             .chain(&self.chain_id.to_be_bytes())
@@ -319,6 +337,7 @@ impl MultiVersionPublicInputs for ChunkInfo {
             (Domain::Scroll, STFVersion::V8) => self.pi_feynman(),
             (Domain::Scroll, STFVersion::V9) => self.pi_galileo(version),
             (Domain::Scroll, STFVersion::V10) => self.pi_galileo_v2(version),
+            (Domain::Scroll, STFVersion::V11) => self.pi_tsuki(version),
             (Domain::Validium, STFVersion::V1) => self.pi_validium(version),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
@@ -338,8 +357,8 @@ impl MultiVersionPublicInputs for ChunkInfo {
         assert_eq!(self.prev_state_root, prev_pi.post_state_root);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
 
-        // Scroll@v10 commits next_message_index into the PI, so it must not regress.
-        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
+        // Scroll@v11 commits next_message_index into the chunk PI, so it must not regress.
+        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V11) {
             assert!(
                 self.next_message_index >= prev_pi.next_message_index,
                 "next_message_index must not regress"
@@ -431,31 +450,43 @@ mod tests {
     }
 
     #[test]
-    fn galileov2_chunk_pi_layout_commits_next_message_index() {
+    fn galileov2_chunk_pi_layout_excludes_next_message_index() {
         let pi = sample_chunk_info(0x0102_0304_0506_0708).pi_galileo_v2(Version::galileo_v2());
+        let changed_pi =
+            sample_chunk_info(0x1112_1314_1516_1718).pi_galileo_v2(Version::galileo_v2());
+
+        assert_eq!(pi.len(), 261);
+        assert_eq!(pi[0], Version::galileo_v2().as_version_byte());
+        assert_eq!(&pi[105..137], B256::repeat_byte(0x55).as_slice());
+        assert_eq!(pi, changed_pi);
+    }
+
+    #[test]
+    fn tsuki_chunk_pi_layout_commits_next_message_index() {
+        let pi = sample_chunk_info(0x0102_0304_0506_0708).pi_tsuki(Version::tsuki());
 
         assert_eq!(pi.len(), 269);
-        assert_eq!(pi[0], Version::galileo_v2().as_version_byte());
+        assert_eq!(pi[0], Version::tsuki().as_version_byte());
         assert_eq!(&pi[105..113], &0x0102_0304_0506_0708u64.to_be_bytes());
         assert_eq!(&pi[113..145], B256::repeat_byte(0x55).as_slice());
     }
 
     #[test]
-    fn galileov2_chunk_validate_reports_regression() {
-        let version = Version::galileo_v2();
+    fn tsuki_chunk_validate_reports_regression() {
+        let version = Version::tsuki();
         let prev = sample_chunk_info(22);
         let current = next_contiguous_chunk(&prev, 21);
 
         let err = std::panic::catch_unwind(|| current.validate(&prev, version))
-            .expect_err("v10 validation must reject regressions");
+            .expect_err("v11 validation must reject regressions");
 
         let message = panic_message(err);
         assert!(message.contains("next_message_index must not regress"));
     }
 
     #[test]
-    fn pre_v10_chunk_validate_ignores_next_message_index_regression() {
-        let version = Version::galileo();
+    fn pre_v11_chunk_validate_ignores_next_message_index_regression() {
+        let version = Version::galileo_v2();
         assert_eq!(version.domain, Domain::Scroll);
 
         let prev = sample_chunk_info(22);

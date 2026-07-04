@@ -257,9 +257,25 @@ impl TaskProver for Prover {
     }
 }
 
+/// Testdata fixture directory for a fork.
+pub fn effective_testdata_fork_directory(fork: ForkName) -> &'static str {
+    match fork {
+        // Dedicated Tsuki fixtures are not checked in yet. Use the latest checked-in Scroll
+        // fixture window only until testdata/tsuki exists.
+        ForkName::Tsuki
+            if !Path::new(testers::PATH_TESTDATA)
+                .join(ForkName::Tsuki.as_str())
+                .exists() =>
+        {
+            ForkName::GalileoV2.as_str()
+        }
+        fork => fork.as_str(),
+    }
+}
+
 /// Enviroment settings for test: fork dir
 pub fn testdata_fork_directory() -> String {
-    testing_hardfork().to_string()
+    effective_testdata_fork_directory(testing_hardfork()).to_string()
 }
 
 /// The outcome of a successful prove-verify run.

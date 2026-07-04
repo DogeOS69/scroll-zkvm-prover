@@ -212,6 +212,7 @@ impl From<u8> for Version {
             (Domain::Scroll, STFVersion::V8) => Self::feynman(),
             (Domain::Scroll, STFVersion::V9) => Self::galileo(),
             (Domain::Scroll, STFVersion::V10) => Self::galileo_v2(),
+            (Domain::Scroll, STFVersion::V11) => Self::tsuki(),
             (Domain::Validium, STFVersion::V1) => Self::validium_v1(),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
