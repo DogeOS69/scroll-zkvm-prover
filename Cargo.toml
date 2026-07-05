@@ -74,10 +74,10 @@ sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier",
 sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "83fe217" }
 sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "83fe217" }
 
-alloy-consensus = "1.0"
-alloy-provider = "1.0"
-alloy-rpc-client = "1.0"
-alloy-transport = "1.0"
+alloy-consensus = "=1.0.41"
+alloy-provider = "=1.0.41"
+alloy-rpc-client = "=1.0.41"
+alloy-transport = "=1.0.41"
 alloy-primitives = { version = "1.4", default-features = false, features = [
   "std",
   "map-hashbrown",
@@ -155,13 +155,6 @@ revm-interpreter = { git = "https://github.com/scroll-tech/revm", tag = "scroll-
 revm-precompile = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
 revm-primitives = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
 revm-state = { git = "https://github.com/scroll-tech/revm", tag = "scroll-v91.1" }
-
-[patch."https://github.com/DogeOS69/stateless-block-verifier"]
-sbv-core = { path = "../stateless-block-verifier/crates/core" }
-sbv-helpers = { path = "../stateless-block-verifier/crates/helpers" }
-sbv-primitives = { path = "../stateless-block-verifier/crates/primitives" }
-sbv-trie = { path = "../stateless-block-verifier/crates/trie" }
-sbv-utils = { path = "../stateless-block-verifier/crates/utils" }
 
 [profile.maxperf]
 inherits = "release"
