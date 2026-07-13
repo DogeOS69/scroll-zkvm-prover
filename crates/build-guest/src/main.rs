@@ -34,7 +34,7 @@
 
 use clap::{Parser, ValueEnum};
 use dotenvy::dotenv;
-use eyre::Result;
+use eyre::{Result, ensure};
 use openvm_build::GuestOptions;
 use openvm_instructions::exe::VmExe;
 use openvm_native_compiler::ir::DIGEST_SIZE;
@@ -83,6 +83,11 @@ struct Cli {
 }
 
 const LOG_PREFIX: &str = "[build-guest]";
+
+/// The guest compiler is part of the circuit identity. OpenVM 1.7 defaults to
+/// an older nightly when this variable is absent, which silently produces a
+/// different executable commitment than the repository's canonical build.
+const OPENVM_RUST_TOOLCHAIN: &str = "nightly-2025-08-18";
 
 /// File descriptor for app openvm config.
 const FD_APP_CONFIG: &str = "openvm.toml";
@@ -369,6 +374,22 @@ fn generate_openvm_assets(
     Ok(())
 }
 
+fn configure_openvm_rust_toolchain() -> Result<()> {
+    match env::var("OPENVM_RUST_TOOLCHAIN") {
+        Ok(toolchain) => ensure!(
+            toolchain == OPENVM_RUST_TOOLCHAIN,
+            "OPENVM_RUST_TOOLCHAIN must be {OPENVM_RUST_TOOLCHAIN}, got {toolchain}"
+        ),
+        Err(env::VarError::NotPresent) => {
+            env::set_var("OPENVM_RUST_TOOLCHAIN", OPENVM_RUST_TOOLCHAIN);
+        }
+        Err(err) => return Err(err.into()),
+    }
+
+    println!("{LOG_PREFIX} Guest Rust toolchain: {OPENVM_RUST_TOOLCHAIN}");
+    Ok(())
+}
+
 pub fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -382,6 +403,7 @@ pub fn main() -> Result<()> {
 
     // Load .env file if present
     dotenv().ok();
+    configure_openvm_rust_toolchain()?;
 
     // Determine workspace root
     let metadata = cargo_metadata::MetadataCommand::new().exec()?;
