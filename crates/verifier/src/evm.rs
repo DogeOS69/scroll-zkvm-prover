@@ -1,5 +1,11 @@
 use openvm_native_recursion::halo2::RawEvmProof;
 use openvm_sdk::types::EvmProof;
+use revm::{
+    Context, ExecuteCommitEvm, MainBuilder, MainContext,
+    context::{TxEnv, result::ExecutionResult},
+    database::InMemoryDB,
+    primitives::TxKind,
+};
 // Re-export from snark_verifier_sdk.
 pub use snark_verifier_sdk::{
     evm::gen_evm_verifier_shplonk as gen_evm_verifier,
@@ -41,10 +47,59 @@ pub fn verify_evm_proof(evm_verifier: &[u8], evm_proof: &EvmProof) -> Result<u64
         .clone()
         .try_into()
         .map_err(|e| format!("Failed to convert EvmProof to RawEvmProof: {}", e))?;
-    snark_verifier_sdk::snark_verifier::loader::evm::deploy_and_call(
-        evm_verifier.to_vec(),
-        evm_proof.verifier_calldata(),
-    )
+    deploy_and_call(evm_verifier.to_vec(), evm_proof.verifier_calldata())
+}
+
+/// Deploy a contract and call it with calldata using the workspace REVM version.
+fn deploy_and_call(deployment_code: Vec<u8>, calldata: Vec<u8>) -> Result<u64, String> {
+    let mut evm = Context::mainnet()
+        .with_db(InMemoryDB::default())
+        .build_mainnet();
+
+    let result = evm
+        .transact_commit(TxEnv {
+            gas_limit: u64::MAX,
+            kind: TxKind::Create,
+            data: deployment_code.into(),
+            ..Default::default()
+        })
+        .map_err(|err| format!("Contract deployment transaction failed: {err:?}"))?;
+    let contract = match result {
+        ExecutionResult::Success {
+            output: revm::context::result::Output::Create(_, Some(contract)),
+            ..
+        } => contract,
+        ExecutionResult::Revert { gas_used, output } => {
+            return Err(format!(
+                "Contract deployment transaction reverts with gas_used {gas_used} and output {output:#x}"
+            ));
+        }
+        ExecutionResult::Halt { reason, gas_used } => {
+            return Err(format!(
+                "Contract deployment transaction halts unexpectedly with gas_used {gas_used} and reason {reason:?}"
+            ));
+        }
+        _ => unreachable!(),
+    };
+
+    let result = evm
+        .transact_commit(TxEnv {
+            gas_limit: u64::MAX,
+            kind: TxKind::Call(contract),
+            data: calldata.into(),
+            nonce: 1,
+            ..Default::default()
+        })
+        .map_err(|err| format!("Contract call transaction failed: {err:?}"))?;
+    match result {
+        ExecutionResult::Success { gas_used, .. } => Ok(gas_used),
+        ExecutionResult::Revert { gas_used, output } => Err(format!(
+            "Contract call transaction reverts with gas_used {gas_used} and output {output:#x}"
+        )),
+        ExecutionResult::Halt { reason, gas_used } => Err(format!(
+            "Contract call transaction halts unexpectedly with gas_used {gas_used} and reason {reason:?}"
+        )),
+    }
 }
 
 #[ignore = "need release assets"]
