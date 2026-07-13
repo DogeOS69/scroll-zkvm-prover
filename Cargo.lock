@@ -7139,7 +7139,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "sbv-core"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=1bc6e037aa0e06254c39e12a65cf49817330c908#1bc6e037aa0e06254c39e12a65cf49817330c908"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=ec6059bdc48fb60d8340ba86b32bbe8d41111cd4#ec6059bdc48fb60d8340ba86b32bbe8d41111cd4"
 dependencies = [
  "auto_impl",
  "itertools 0.14.0",
@@ -7155,7 +7155,7 @@ dependencies = [
 [[package]]
 name = "sbv-helpers"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=1bc6e037aa0e06254c39e12a65cf49817330c908#1bc6e037aa0e06254c39e12a65cf49817330c908"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=ec6059bdc48fb60d8340ba86b32bbe8d41111cd4#ec6059bdc48fb60d8340ba86b32bbe8d41111cd4"
 dependencies = [
  "tracing",
 ]
@@ -7163,7 +7163,7 @@ dependencies = [
 [[package]]
 name = "sbv-primitives"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=1bc6e037aa0e06254c39e12a65cf49817330c908#1bc6e037aa0e06254c39e12a65cf49817330c908"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=ec6059bdc48fb60d8340ba86b32bbe8d41111cd4#ec6059bdc48fb60d8340ba86b32bbe8d41111cd4"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -7197,7 +7197,7 @@ dependencies = [
 [[package]]
 name = "sbv-trie"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=1bc6e037aa0e06254c39e12a65cf49817330c908#1bc6e037aa0e06254c39e12a65cf49817330c908"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=ec6059bdc48fb60d8340ba86b32bbe8d41111cd4#ec6059bdc48fb60d8340ba86b32bbe8d41111cd4"
 dependencies = [
  "alloy-rlp",
  "alloy-trie 0.9.5",
@@ -7209,7 +7209,7 @@ dependencies = [
 [[package]]
 name = "sbv-utils"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=1bc6e037aa0e06254c39e12a65cf49817330c908#1bc6e037aa0e06254c39e12a65cf49817330c908"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=ec6059bdc48fb60d8340ba86b32bbe8d41111cd4#ec6059bdc48fb60d8340ba86b32bbe8d41111cd4"
 dependencies = [
  "alloy-provider",
  "alloy-transport",
