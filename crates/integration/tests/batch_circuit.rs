@@ -3,7 +3,10 @@ use scroll_zkvm_integration::{
     ProverTester,
     testers::{
         batch::{BatchProverTester, BatchTaskGenerator},
-        chunk::{ChunkProverTester, create_canonical_tasks, preset_chunk_multiple},
+        chunk::{
+            ChunkProverTester, create_canonical_tasks, preset_chunk_multiple,
+            tsuki_golden_chunk_tasks,
+        },
         load_local_task,
     },
     testing_version,
@@ -133,7 +136,7 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
 
 #[test]
 fn test_tsuki_golden_batch_metadata() -> eyre::Result<()> {
-    let chunks = preset_chunk_multiple()
+    let chunks = tsuki_golden_chunk_tasks()?
         .into_iter()
         .map(|mut task| task.get_or_build_witness())
         .collect::<eyre::Result<Vec<_>>>()?;

@@ -9,7 +9,7 @@ use scroll_zkvm_integration::{
     ProverTester, prove_verify,
     testers::chunk::{
         ChunkProverTester, ChunkTaskGenerator, get_witness_from_env_or_builder, preset_chunk,
-        preset_chunk_multiple,
+        preset_chunk_multiple, tsuki_golden_chunk_tasks,
     },
     utils::metadata_from_chunk_witnesses,
 };
@@ -47,9 +47,9 @@ fn test_execute() -> eyre::Result<()> {
 
     let wit = get_witness_from_env_or_builder(&mut preset_chunk())?;
     let (exec_result, total_gas_used) = exec_chunk(&wit)?;
-    let cycle_per_gas = exec_result.total_cycle / total_gas_used;
-    assert_ne!(cycle_per_gas, 0);
-    assert!(cycle_per_gas <= 35);
+    let cycle_per_gas = exec_result.total_cycle as f64 / total_gas_used as f64;
+    assert!(cycle_per_gas > 0.0);
+    assert!(cycle_per_gas <= 35.0);
     Ok(())
 }
 
@@ -171,7 +171,7 @@ fn test_execute_multi() -> eyre::Result<()> {
 #[test]
 fn test_tsuki_golden_chunk_metadata() -> eyre::Result<()> {
     let version = Version::tsuki();
-    let infos = preset_chunk_multiple()
+    let infos = tsuki_golden_chunk_tasks()?
         .into_iter()
         .map(|mut task| metadata_from_chunk_witnesses(task.get_or_build_witness()?))
         .collect::<eyre::Result<Vec<_>>>()?;

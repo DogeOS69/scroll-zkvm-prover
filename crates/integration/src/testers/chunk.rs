@@ -260,6 +260,14 @@ pub fn create_canonical_tasks(
     Ok(ret)
 }
 
+fn tsuki_golden_chunk_ranges() -> [std::ops::RangeInclusive<u64>; 4] {
+    [1..=8, 9..=16, 17..=20, 21..=26]
+}
+
+pub fn tsuki_golden_chunk_tasks() -> eyre::Result<Vec<ChunkTaskGenerator>> {
+    create_canonical_tasks(Version::tsuki(), tsuki_golden_chunk_ranges().into_iter())
+}
+
 /// preset examples for multiple task
 pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
     let (mut block_range, version) = match testing_hardfork() {
@@ -299,7 +307,10 @@ pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
             ],
             Version::galileo_v2(),
         ),
-        ForkName::Tsuki => (vec![1..=8, 9..=16, 17..=20, 21..=26], Version::tsuki()),
+        ForkName::Tsuki => (
+            tsuki_golden_chunk_ranges().into_iter().collect(),
+            Version::tsuki(),
+        ),
     };
     // If the BLOCK_RANGE env var has been set, use that instead.
     if let Ok(r) = std::env::var("BLOCK_RANGE") {
@@ -342,7 +353,7 @@ pub fn exec_chunk(wit: &ChunkWitness) -> eyre::Result<(ExecutionResult, u64)> {
     println!("chunk stats {:#?}", stats);
     let exec_result = tester_execute::<ChunkProverTester>(wit, &[])?;
     let cycle_count = exec_result.total_cycle as u64;
-    let cycle_per_gas = cycle_count / stats.total_gas_used;
+    let cycle_per_gas = cycle_count as f64 / stats.total_gas_used as f64;
     println!(
         "blk {blk}->{}, cycle {cycle_count}, gas {}, cycle-per-gas {cycle_per_gas}",
         wit.blocks.last().unwrap().header.number,
