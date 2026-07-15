@@ -153,6 +153,11 @@ The resulting identities are:
 - batch program commitment:
   `01ae5d1707fdf01222e13c2830da7d33554bf90f95e1064fd4260645715b395b2990880f5a2046743a5d425c40bb726a5262c65b68fdf72900d74c70fc3c945f`.
 
+These hashes identify the external artifacts used for this proving run. This
+fixture-only change does not replace the repository's canonical generated
+commitment files: changing that release identity requires the containerized
+`make build-guest` path and a complete chunk, batch, and bundle rebuild.
+
 With that release staged under `releases/dogeos-openvm17-tsuki-dog424`, the
 following Make targets execute the four chunks, generate and verify all four
 child STARK proofs, and recursively verify them in the batch guest:
