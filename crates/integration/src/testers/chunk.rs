@@ -204,8 +204,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
-        // Reuse the checked-in GalileoV2 fixture window until dedicated Tsuki fixtures land.
-        ForkName::Tsuki => (Version::tsuki(), 20239240..=20239245),
+        ForkName::Tsuki => (Version::tsuki(), 1..=26),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -300,15 +299,7 @@ pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
             ],
             Version::galileo_v2(),
         ),
-        // Reuse the checked-in GalileoV2 fixture window until dedicated Tsuki fixtures land.
-        ForkName::Tsuki => (
-            vec![
-                20239240..=20239240,
-                20239241..=20239241,
-                20239242..=20239242,
-            ],
-            Version::tsuki(),
-        ),
+        ForkName::Tsuki => (vec![1..=8, 9..=16, 17..=20, 21..=26], Version::tsuki()),
     };
     // If the BLOCK_RANGE env var has been set, use that instead.
     if let Ok(r) = std::env::var("BLOCK_RANGE") {

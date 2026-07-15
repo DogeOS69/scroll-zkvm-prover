@@ -1,3 +1,4 @@
+use alloy_primitives::b256;
 use scroll_zkvm_integration::{
     ProverTester,
     testers::{
@@ -6,9 +7,10 @@ use scroll_zkvm_integration::{
         load_local_task,
     },
     testing_version,
+    utils::{build_batch_witnesses, metadata_from_batch_witnesses},
 };
 use scroll_zkvm_prover::task::ProvingTask;
-use scroll_zkvm_types::public_inputs::Version;
+use scroll_zkvm_types::public_inputs::{MultiVersionPublicInputs, Version};
 
 #[ignore = "need local stuff"]
 #[test]
@@ -113,15 +115,7 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
                 20239244..=20239245,
             ],
         ),
-        ForkName::Tsuki => (
-            Version::tsuki(),
-            // Dedicated Tsuki fixtures are not checked in yet; reuse the GalileoV2 fixture window.
-            vec![
-                20239240..=20239241,
-                20239242..=20239243,
-                20239244..=20239245,
-            ],
-        ),
+        ForkName::Tsuki => (Version::tsuki(), vec![1..=8, 9..=16, 17..=20, 21..=26]),
     };
     let outcome_2 = create_canonical_tasks(version, block_range.into_iter())?;
 
@@ -132,6 +126,40 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
     assert_eq!(
         task_1.get_or_build_witness()?.blob_bytes,
         task_2.get_or_build_witness()?.blob_bytes,
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_tsuki_golden_batch_metadata() -> eyre::Result<()> {
+    let chunks = preset_chunk_multiple()
+        .into_iter()
+        .map(|mut task| task.get_or_build_witness())
+        .collect::<eyre::Result<Vec<_>>>()?;
+    assert_eq!(
+        chunks.len(),
+        4,
+        "the batch must aggregate four child chunks"
+    );
+
+    let witness = build_batch_witnesses(&chunks, &[0u8; 64], Default::default())?;
+    assert_eq!(witness.chunk_infos.len(), 4);
+
+    let info = metadata_from_batch_witnesses(&witness)?;
+    assert_eq!(info.chain_id, 6_281_971);
+    assert_eq!(info.next_message_index, 1);
+    assert_eq!(
+        info.parent_state_root,
+        b256!("8938aed386448da2e825974f29a8f14a862bfa9f94973a8cea261542ff8792a1")
+    );
+    assert_eq!(
+        info.state_root,
+        b256!("54097ced498c20c61c9817f44dae4a4cb197c818810aa5a9717c67814f3925f6")
+    );
+    assert_eq!(
+        info.pi_hash_by_version(Version::tsuki()),
+        b256!("61a7f518bff28cb6e973af222e19ffdcef4dc7edeb30bff851650ddc0eab1773")
     );
 
     Ok(())

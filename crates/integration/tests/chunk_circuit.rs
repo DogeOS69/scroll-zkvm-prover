@@ -1,4 +1,4 @@
-use alloy_primitives::B256;
+use alloy_primitives::{B256, b256};
 use eyre::Ok;
 use sbv_primitives::types::consensus::TxL1Message;
 use scroll_zkvm_integration::testers::PATH_TESTDATA;
@@ -14,7 +14,7 @@ use scroll_zkvm_integration::{
     utils::metadata_from_chunk_witnesses,
 };
 use scroll_zkvm_prover::utils::read_json;
-use scroll_zkvm_types::public_inputs::Version;
+use scroll_zkvm_types::public_inputs::{MultiVersionPublicInputs, Version};
 use scroll_zkvm_types::scroll::chunk::{ChunkWitness, SecretKey};
 use std::env;
 use std::path::Path;
@@ -164,6 +164,156 @@ fn test_execute_multi() -> eyre::Result<()> {
         total_cycle,
         total_cycle as f64 / total_gas as f64,
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_tsuki_golden_chunk_metadata() -> eyre::Result<()> {
+    let version = Version::tsuki();
+    let infos = preset_chunk_multiple()
+        .into_iter()
+        .map(|mut task| metadata_from_chunk_witnesses(task.get_or_build_witness()?))
+        .collect::<eyre::Result<Vec<_>>>()?;
+
+    assert_eq!(infos.len(), 4, "the batch must aggregate four child chunks");
+    assert_eq!(
+        infos
+            .iter()
+            .map(|info| info.initial_block_number)
+            .collect::<Vec<_>>(),
+        [1, 9, 17, 21]
+    );
+    assert_eq!(
+        infos
+            .iter()
+            .map(|info| info.block_ctxs.len())
+            .collect::<Vec<_>>(),
+        [8, 8, 4, 6]
+    );
+    assert_eq!(
+        infos
+            .iter()
+            .map(|info| info.next_message_index)
+            .collect::<Vec<_>>(),
+        [0, 0, 1, 1]
+    );
+    assert_eq!(
+        infos[0].prev_state_root,
+        b256!("8938aed386448da2e825974f29a8f14a862bfa9f94973a8cea261542ff8792a1")
+    );
+    assert_eq!(
+        infos[0].post_state_root,
+        b256!("15c80478db61728fc66486ddefcdacac54201cc387fd650c33bff7665040e508")
+    );
+    assert_eq!(
+        infos[1].post_state_root,
+        b256!("d91fa7eb65477f108002dfa303f52d4db71cdfd94eab291c5698f8ecadbee89e")
+    );
+    assert_eq!(
+        infos[2].post_state_root,
+        b256!("21d953b3b999fd84849a86ab365eca67d68a1ce9c34e816fd746630b8388eb9f")
+    );
+    assert_eq!(
+        infos[3].post_state_root,
+        b256!("54097ced498c20c61c9817f44dae4a4cb197c818810aa5a9717c67814f3925f6")
+    );
+
+    for pair in infos.windows(2) {
+        pair[1].validate(&pair[0], version);
+    }
+
+    assert_eq!(
+        infos
+            .iter()
+            .map(|info| info.pi_hash_by_version(version))
+            .collect::<Vec<_>>(),
+        [
+            b256!("ca2da9b9bca7caccda93c8fcac9a34bf0b9c944b8598ac92be40881b7618b787"),
+            b256!("b6102e1080723bdec5040facdc096d04049dd1f2ae92285f0bb448cf14dfdd44"),
+            b256!("96347767e5c6c67617d5eff9ca0f7bbe210adc6116700647a6eec32166b94110"),
+            b256!("fa07464856cdf99805f59f09d53273c459de5b9e15a714fd12c4a08b480ea9b1"),
+        ]
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_tsuki_edge_fixture_contract() -> eyre::Result<()> {
+    fn transaction(value: &serde_json::Value) -> &serde_json::Value {
+        &value["transactions"][0]["Eip1559"]["transaction"]
+    }
+
+    let base_dir = Path::new(PATH_TESTDATA).join("tsuki").join("witnesses");
+    let fixture = |block: u64| -> eyre::Result<serde_json::Value> {
+        Ok(read_json(base_dir.join(format!("{block}.json")))?)
+    };
+
+    let native_success = fixture(21)?;
+    assert_eq!(
+        transaction(&native_success)["to"],
+        "0x530000000000000000000000000000000000d09e"
+    );
+    assert_eq!(
+        transaction(&native_success)["input"],
+        "0xa9059cbb000000000000000000000000000000000000000000000000000000000000beef0000000000000000000000000000000000000000000000000000000000003039"
+    );
+    assert_eq!(native_success["header"]["gas_used"], 33_612);
+
+    let ripemd_limit = fixture(22)?;
+    assert_eq!(
+        transaction(&ripemd_limit)["to"],
+        "0x0000000000000000000000000000000000000003"
+    );
+    assert_eq!(
+        transaction(&ripemd_limit)["input"]
+            .as_str()
+            .expect("RIPEMD input")
+            .len(),
+        2 + 32 * 2
+    );
+
+    let ripemd_overflow = fixture(23)?;
+    assert_eq!(
+        transaction(&ripemd_overflow)["input"]
+            .as_str()
+            .expect("RIPEMD overflow input")
+            .len(),
+        2 + 33 * 2
+    );
+    assert_eq!(ripemd_overflow["header"]["gas_used"], 100_000);
+
+    let unauthorized_transfer = fixture(24)?;
+    assert_eq!(
+        transaction(&unauthorized_transfer)["to"],
+        "0x00000000000000000000000000000000000000fd"
+    );
+    assert_eq!(
+        transaction(&unauthorized_transfer)["input"],
+        "0x000000000000000000000000ded06046416d6ba20c1e2bad51b3a3e2f267d33f000000000000000000000000000000000000000000000000000000000000beef0000000000000000000000000000000000000000000000000000000000000001"
+    );
+    assert_eq!(unauthorized_transfer["header"]["gas_used"], 100_000);
+
+    let insufficient_native_balance = fixture(25)?;
+    assert_eq!(
+        transaction(&insufficient_native_balance)["to"],
+        "0x530000000000000000000000000000000000d09e"
+    );
+    assert_eq!(
+        transaction(&insufficient_native_balance)["input"],
+        "0xa9059cbb000000000000000000000000000000000000000000000000000000000000beef000000000000000000000000000000000000000c9f2c9cd04674edea40000000"
+    );
+    assert_eq!(insufficient_native_balance["header"]["gas_used"], 22_189);
+
+    let eip7825_limit = fixture(26)?;
+    assert_eq!(
+        transaction(&eip7825_limit)["to"],
+        "0x0000000000000000000000000000000000000001"
+    );
+    assert_eq!(transaction(&eip7825_limit)["input"], "0x");
+    assert_eq!(transaction(&eip7825_limit)["gas_limit"], 16_777_216);
+    assert_eq!(eip7825_limit["header"]["gas_used"], 24_000);
 
     Ok(())
 }

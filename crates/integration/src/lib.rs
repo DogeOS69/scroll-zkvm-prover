@@ -46,7 +46,7 @@ pub fn testing_hardfork() -> ForkName {
 
 /// Test settings (version).
 pub fn testing_version() -> Version {
-    Version::galileo_v2()
+    Version::tsuki()
 }
 
 pub fn testing_version_validium() -> Version {
