@@ -70,6 +70,7 @@ test-tsuki-golden:
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test chunk_circuit test_tsuki -- --nocapture
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test batch_circuit test_tsuki_golden_batch_metadata -- --exact --nocapture
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration test_build_and_parse_batch_task -- --nocapture
+	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration testers::chunk::tests::test_presets -- --exact --nocapture
 
 test-execute-validium-chunk:
 	@cargo test --release -p scroll-zkvm-integration --test chunk_circuit test_execute_validium -- --exact --nocapture

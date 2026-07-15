@@ -375,24 +375,15 @@ mod tests {
 
     #[test]
     fn test_presets() {
+        std::env::remove_var("BLOCK_RANGE");
+
         let single = preset_chunk();
-        assert_eq!(
-            single.block_range,
-            (20239240u64..=20239245).collect::<Vec<u64>>(),
-        );
+        assert_eq!(single.block_range, (1u64..=26).collect::<Vec<u64>>(),);
         let multiple = preset_chunk_multiple();
-        assert_eq!(
-            multiple[0].block_range,
-            (20239240..=20239240).collect::<Vec<u64>>(),
-        );
-        assert_eq!(
-            multiple[1].block_range,
-            (20239241..=20239241).collect::<Vec<u64>>(),
-        );
-        assert_eq!(
-            multiple[2].block_range,
-            (20239242..=20239242).collect::<Vec<u64>>(),
-        );
+        assert_eq!(multiple[0].block_range, (1..=8).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[1].block_range, (9..=16).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[2].block_range, (17..=20).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[3].block_range, (21..=26).collect::<Vec<u64>>(),);
 
         // After setting env var.
         std::env::set_var("BLOCK_RANGE", "123..=321");
@@ -400,22 +391,12 @@ mod tests {
             preset_chunk().block_range,
             (123..=321).collect::<Vec<u64>>()
         );
-        std::env::set_var(
-            "BLOCK_RANGE",
-            "20239240..=20239241,20239242..=20239243,20239244..=20239245",
-        );
+        std::env::set_var("BLOCK_RANGE", "1..=2,3..=4,5..=6");
         let multiple = preset_chunk_multiple();
-        assert_eq!(
-            multiple[0].block_range,
-            (20239240u64..=20239241u64).collect::<Vec<u64>>()
-        );
-        assert_eq!(
-            multiple[1].block_range,
-            (20239242u64..=20239243u64).collect::<Vec<u64>>()
-        );
-        assert_eq!(
-            multiple[2].block_range,
-            (20239244u64..=20239245u64).collect::<Vec<u64>>()
-        );
+        assert_eq!(multiple[0].block_range, (1u64..=2u64).collect::<Vec<u64>>());
+        assert_eq!(multiple[1].block_range, (3u64..=4u64).collect::<Vec<u64>>());
+        assert_eq!(multiple[2].block_range, (5u64..=6u64).collect::<Vec<u64>>());
+
+        std::env::remove_var("BLOCK_RANGE");
     }
 }
