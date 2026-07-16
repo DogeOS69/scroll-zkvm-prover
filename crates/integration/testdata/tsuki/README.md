@@ -42,8 +42,8 @@ The lineage exercises the Tsuki execution and proof path with:
   independently proven child chunks;
 - v11 chunk and batch public inputs, including the committed
   `next_message_index`; and
-- blob construction, point-evaluation verification, and multi-child batch
-  aggregation.
+- blob construction and multi-child batch aggregation. The separately documented
+  guest batch targets also verify the point evaluation inside the batch circuit.
 
 The focused edge blocks are:
 
