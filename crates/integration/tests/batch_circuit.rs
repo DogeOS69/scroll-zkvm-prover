@@ -4,7 +4,7 @@ use scroll_zkvm_integration::{
     testers::{
         batch::{BatchProverTester, BatchTaskGenerator},
         chunk::{
-            ChunkProverTester, create_canonical_tasks, preset_chunk_multiple,
+            ChunkProverTester, ChunkTaskGenerator, create_canonical_tasks, preset_chunk_multiple,
             tsuki_golden_chunk_tasks,
         },
         load_local_task,
@@ -77,7 +77,6 @@ fn e2e() -> eyre::Result<()> {
 #[test]
 fn verify_batch_hash_invariant() -> eyre::Result<()> {
     use scroll_zkvm_types::public_inputs::ForkName;
-    BatchProverTester::setup(true)?;
 
     let outcome_1 = preset_chunk_multiple();
     let (version, block_range) = match testing_version().fork {
@@ -118,18 +117,22 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
                 20239244..=20239245,
             ],
         ),
-        ForkName::Tsuki => (Version::tsuki(), vec![1..=8, 9..=16, 17..=20, 21..=26]),
+        ForkName::Tsuki => (Version::tsuki(), vec![1..=10, 11..=20, 21..=26]),
     };
     let outcome_2 = create_canonical_tasks(version, block_range.into_iter())?;
 
-    let mut task_1 = BatchTaskGenerator::from_chunk_tasks(&outcome_1, None);
-    let mut task_2 = BatchTaskGenerator::from_chunk_tasks(&outcome_2, None);
+    let build_witness = |tasks: Vec<ChunkTaskGenerator>| -> eyre::Result<_> {
+        let chunks = tasks
+            .into_iter()
+            .map(|mut task| task.get_or_build_witness())
+            .collect::<eyre::Result<Vec<_>>>()?;
+        build_batch_witnesses(&chunks, &[0u8; 64], Default::default())
+    };
+    let witness_1 = build_witness(outcome_1)?;
+    let witness_2 = build_witness(outcome_2)?;
 
     // verify the two task has the same blob bytes
-    assert_eq!(
-        task_1.get_or_build_witness()?.blob_bytes,
-        task_2.get_or_build_witness()?.blob_bytes,
-    );
+    assert_eq!(witness_1.blob_bytes, witness_2.blob_bytes);
 
     Ok(())
 }

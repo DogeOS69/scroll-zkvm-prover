@@ -276,6 +276,10 @@ fn test_tsuki_edge_fixture_contract() -> eyre::Result<()> {
 
     let ripemd_overflow = fixture(23)?;
     assert_eq!(
+        transaction(&ripemd_overflow)["to"],
+        "0x0000000000000000000000000000000000000003"
+    );
+    assert_eq!(
         transaction(&ripemd_overflow)["input"]
             .as_str()
             .expect("RIPEMD overflow input")
