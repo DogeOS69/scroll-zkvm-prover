@@ -120,9 +120,9 @@ cast send --rpc-url "$RPC" --private-key "$DEPLOYER_PRIVATE_KEY" \
 ```
 
 `sbv-cli` ranges are end-exclusive, hence `1..27`. JSON map ordering can vary
-between otherwise equivalent dumps, so `SHA256SUMS` pins the exact checked-in
-bytes while the integration tests pin the consensus roots and public-input
-hashes.
+between otherwise equivalent dumps, so `SHA256SUMS` records the exact checked-in
+bytes. `make test-tsuki-golden` verifies those checksums before the integration
+tests pin the consensus roots and public-input hashes.
 
 ## OpenVM proof identity
 

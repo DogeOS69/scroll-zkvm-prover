@@ -78,7 +78,11 @@ fn e2e() -> eyre::Result<()> {
 fn verify_batch_hash_invariant() -> eyre::Result<()> {
     use scroll_zkvm_types::public_inputs::ForkName;
 
-    let outcome_1 = preset_chunk_multiple();
+    let outcome_1 = if testing_version().fork == ForkName::Tsuki {
+        tsuki_golden_chunk_tasks()?
+    } else {
+        preset_chunk_multiple()
+    };
     let (version, block_range) = match testing_version().fork {
         ForkName::EuclidV1 => (
             Version::euclid_v1(),

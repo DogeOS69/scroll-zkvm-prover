@@ -160,9 +160,8 @@ fn e2e_inner(
         ForkName::GalileoV2 => {
             Some("7ff4ebd1e74adf0f7740df04d9ba7a334beb37faffa126dda00c6b2ade8f90d4")
         }
-        // Tsuki bundle e2e fixtures and a golden bundle PI hash are out of scope until
-        // testdata/tsuki is checked in. The proof-vs-metadata PI check below still runs if
-        // the fixtures are available.
+        // A pinned Tsuki bundle PI hash remains follow-up scope. The proof-vs-metadata PI
+        // check below still covers the checked-in Tsuki fixture corpus.
         ForkName::Tsuki => None,
     };
     let expected_pi_hash = metadata.pi_hash_by_version(version);

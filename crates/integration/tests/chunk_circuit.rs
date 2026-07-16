@@ -176,7 +176,7 @@ fn test_tsuki_golden_chunk_metadata() -> eyre::Result<()> {
         .map(|mut task| metadata_from_chunk_witnesses(task.get_or_build_witness()?))
         .collect::<eyre::Result<Vec<_>>>()?;
 
-    assert_eq!(infos.len(), 4, "the batch must aggregate four child chunks");
+    assert_eq!(infos.len(), 4, "the golden corpus must contain four chunks");
     assert_eq!(
         infos
             .iter()

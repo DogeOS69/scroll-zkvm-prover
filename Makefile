@@ -67,6 +67,7 @@ test-execute-chunk-multi:
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test chunk_circuit test_execute_multi -- --exact --nocapture
 
 test-tsuki-golden:
+	@if command -v sha256sum >/dev/null 2>&1; then cd crates/integration/testdata/tsuki && sha256sum -c SHA256SUMS; else cd crates/integration/testdata/tsuki && shasum -a 256 -c SHA256SUMS; fi
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test chunk_circuit test_tsuki -- --nocapture
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test batch_circuit test_tsuki_golden_batch_metadata -- --exact --nocapture
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test batch_circuit verify_batch_hash_invariant -- --exact --nocapture
