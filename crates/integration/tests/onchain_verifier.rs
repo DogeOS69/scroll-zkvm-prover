@@ -22,15 +22,17 @@ fn deploy(init_code: &[u8]) -> eyre::Result<(Bytes, B256)> {
             output: Output::Create(code, _),
             ..
         } => code,
-        ExecutionResult::Revert { gas_used, output } => {
+        ExecutionResult::Revert { gas, output, .. } => {
             return Err(eyre::eyre!(
-                "Contract deployment tx reverted: gas_used={gas_used}, output={:#x}",
+                "Contract deployment tx reverted: gas_used={}, output={:#x}",
+                gas.used(),
                 output
             ));
         }
-        ExecutionResult::Halt { reason, gas_used } => {
+        ExecutionResult::Halt { reason, gas, .. } => {
             return Err(eyre::eyre!(
-                "Contract deployment tx halted unexpectedly: gas_used={gas_used}, reason={:?}",
+                "Contract deployment tx halted unexpectedly: gas_used={}, reason={:?}",
+                gas.used(),
                 reason
             ));
         }

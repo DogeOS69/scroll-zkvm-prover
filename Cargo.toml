@@ -68,23 +68,23 @@ openvm-transpiler = { git = "https://github.com/openvm-org/openvm.git", tag = "v
 # more openvm related libs
 openvm-stark-sdk = { git = "https://github.com/openvm-org/stark-backend.git", tag = "v1.4.0", default-features = false }
 
-sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "ec6059bdc48fb60d8340ba86b32bbe8d41111cd4" }
-sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "ec6059bdc48fb60d8340ba86b32bbe8d41111cd4", features = ["dev"] }
-sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "ec6059bdc48fb60d8340ba86b32bbe8d41111cd4" }
-sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "ec6059bdc48fb60d8340ba86b32bbe8d41111cd4" }
-sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "ec6059bdc48fb60d8340ba86b32bbe8d41111cd4" }
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d5d98683080acf5ec12062d1e742bc10a4aa86ba" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d5d98683080acf5ec12062d1e742bc10a4aa86ba", features = ["dev"] }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d5d98683080acf5ec12062d1e742bc10a4aa86ba" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d5d98683080acf5ec12062d1e742bc10a4aa86ba" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d5d98683080acf5ec12062d1e742bc10a4aa86ba" }
 
-alloy-consensus = "=1.6.3"
-alloy-provider = "=1.6.3"
-alloy-rpc-client = "=1.6.3"
-alloy-transport = "=1.6.3"
-alloy-primitives = { version = "=1.5.6", default-features = false, features = [
+alloy-consensus = "=1.8.2"
+alloy-provider = "=1.8.2"
+alloy-rpc-client = "=1.8.2"
+alloy-transport = "=1.8.2"
+alloy-primitives = { version = "=1.5.7", default-features = false, features = [
   "std",
   "map-hashbrown",
   "map-fxhash",
 ] }
-alloy-serde = { version = "=1.6.3", default-features = false }
-alloy-sol-types = { version = "=1.5.6", default-features = false }
+alloy-serde = { version = "=1.8.2", default-features = false }
+alloy-sol-types = { version = "=1.5.7", default-features = false }
 bitcode = { version = "0.6.5", default-features = false, features = [
   "serde",
   "derive",
@@ -108,7 +108,7 @@ metrics = "0.23.0"
 metrics-util = "0.17"
 metrics-tracing-context = "0.16.0"
 rayon = "1.10"
-revm = "=34.0.0"
+revm = "=36.0.0"
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0" }
 serde_with = "3.11.0"
@@ -140,20 +140,6 @@ scroll-zkvm-types-bundle = { path = "crates/types/bundle" }
 scroll-zkvm-integration = { path = "crates/integration" }
 scroll-zkvm-prover = { path = "crates/prover" }
 scroll-zkvm-verifier = { path = "crates/verifier" }
-
-[patch.crates-io]
-revm = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-bytecode = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-context = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-context-interface = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-database = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-database-interface = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-handler = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-inspector = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-interpreter = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-precompile = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-primitives = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
-revm-state = { git = "https://github.com/scroll-tech/revm", branch = "feat/v103" }
 
 #[patch."https://github.com/DogeOS69/stateless-block-verifier"]
 #sbv-core = { path = "../stateless-block-verifier/crates/core" }
