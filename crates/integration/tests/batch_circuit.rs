@@ -115,12 +115,8 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
         ),
         ForkName::Tsuki => (
             Version::tsuki(),
-            // Dedicated Tsuki fixtures are not checked in yet; reuse the GalileoV2 fixture window.
-            vec![
-                20239240..=20239241,
-                20239242..=20239243,
-                20239244..=20239245,
-            ],
+            // The committed DogeOS fixture shares de-duplicated trie nodes across the chunk.
+            vec![11..=13],
         ),
     };
     let outcome_2 = create_canonical_tasks(version, block_range.into_iter())?;
