@@ -58,12 +58,14 @@ fn dogeos_next_message_index_committed_fixture() -> Result<()> {
     let dir = feature_path();
 
     let manifest_path = dir.join("manifest.json");
-    let manifest: Manifest = serde_json::from_slice(
-        &std::fs::read(&manifest_path).wrap_err_with(|| {
-            format!("missing DogeOS fixture manifest at {}", manifest_path.display())
-        })?,
-    )
-    .wrap_err("failed to parse DogeOS fixture manifest")?;
+    let manifest: Manifest =
+        serde_json::from_slice(&std::fs::read(&manifest_path).wrap_err_with(|| {
+            format!(
+                "missing DogeOS fixture manifest at {}",
+                manifest_path.display()
+            )
+        })?)
+        .wrap_err("failed to parse DogeOS fixture manifest")?;
 
     // Tsuki (Scroll@v11) is DogeOS's production fork that commits next_message_index into the PI.
     eyre::ensure!(
