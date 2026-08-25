@@ -1,4 +1,3 @@
-use openvm_native_recursion::halo2::RawEvmProof;
 use openvm_sdk::types::EvmProof;
 use revm::{
     Context, ExecuteCommitEvm, MainBuilder, MainContext,
@@ -43,11 +42,7 @@ pub fn deserialize_vk<C: Circuit<Fr, Params = ()>>(raw_vk: &[u8]) -> VerifyingKe
 /// - Deploy [`EvmVerifier`].
 /// - Verify [`EvmProof`] encoded as calldata.
 pub fn verify_evm_proof(evm_verifier: &[u8], evm_proof: &EvmProof) -> Result<u64, String> {
-    let evm_proof: RawEvmProof = evm_proof
-        .clone()
-        .try_into()
-        .map_err(|e| format!("Failed to convert EvmProof to RawEvmProof: {}", e))?;
-    deploy_and_call(evm_verifier.to_vec(), evm_proof.verifier_calldata())
+    deploy_and_call(evm_verifier.to_vec(), evm_proof.clone().verifier_calldata())
 }
 
 /// Deploy a contract and call it with calldata using the workspace REVM version.
