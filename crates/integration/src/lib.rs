@@ -259,10 +259,7 @@ impl TaskProver for Prover {
 
 /// Testdata fixture directory for a fork.
 pub fn effective_testdata_fork_directory(fork: ForkName) -> &'static str {
-    match fork {
-        ForkName::Tsuki => "dogeos/next-message-index",
-        fork => fork.as_str(),
-    }
+    fork.as_str()
 }
 
 /// Enviroment settings for test: fork dir
