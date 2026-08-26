@@ -46,7 +46,7 @@ pub fn testing_hardfork() -> ForkName {
 
 /// Test settings (version).
 pub fn testing_version() -> Version {
-    Version::galileo_v2()
+    Version::tsuki()
 }
 
 pub fn testing_version_validium() -> Version {
@@ -257,9 +257,14 @@ impl TaskProver for Prover {
     }
 }
 
+/// Testdata fixture directory for a fork.
+pub fn effective_testdata_fork_directory(fork: ForkName) -> &'static str {
+    fork.as_str()
+}
+
 /// Enviroment settings for test: fork dir
 pub fn testdata_fork_directory() -> String {
-    testing_hardfork().to_string()
+    effective_testdata_fork_directory(testing_hardfork()).to_string()
 }
 
 /// The outcome of a successful prove-verify run.

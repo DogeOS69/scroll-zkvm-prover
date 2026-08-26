@@ -84,6 +84,10 @@ struct Cli {
 
 const LOG_PREFIX: &str = "[build-guest]";
 
+/// Default guest compiler. The environment may override this through
+/// `OPENVM_RUST_TOOLCHAIN`; the selected compiler is part of the circuit identity.
+const DEFAULT_OPENVM_RUST_TOOLCHAIN: &str = "nightly-2026-03-17";
+
 /// File descriptor for app openvm config.
 const FD_APP_CONFIG: &str = "openvm.toml";
 
@@ -369,6 +373,20 @@ fn generate_openvm_assets(
     Ok(())
 }
 
+fn configure_openvm_rust_toolchain() -> Result<()> {
+    let toolchain = match env::var("OPENVM_RUST_TOOLCHAIN") {
+        Ok(toolchain) => toolchain,
+        Err(env::VarError::NotPresent) => {
+            env::set_var("OPENVM_RUST_TOOLCHAIN", DEFAULT_OPENVM_RUST_TOOLCHAIN);
+            DEFAULT_OPENVM_RUST_TOOLCHAIN.to_owned()
+        }
+        Err(err) => return Err(err.into()),
+    };
+
+    println!("{LOG_PREFIX} Guest Rust toolchain: {toolchain}");
+    Ok(())
+}
+
 pub fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -382,6 +400,7 @@ pub fn main() -> Result<()> {
 
     // Load .env file if present
     dotenv().ok();
+    configure_openvm_rust_toolchain()?;
 
     // Determine workspace root
     let metadata = cargo_metadata::MetadataCommand::new().exec()?;

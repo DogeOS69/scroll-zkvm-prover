@@ -3,10 +3,14 @@ name: Build Guest
 on:
   pull_request:
     types: [synchronize, opened, reopened, ready_for_review]
-    branches:
-      - master
-      - release/*
     paths:
+      - .github/workflows/build-guest.yml
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - Makefile
+      - Dockerfile
+      - build-guest.sh
       - crates/circuits/types/**/*
       - crates/circuits/chunk-circuit/**/*
       - crates/circuits/batch-circuit/**/*
@@ -15,8 +19,16 @@ on:
   push:
     branches:
       - master
+      - dogeos/main
       - release/*
     paths:
+      - .github/workflows/build-guest.yml
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - Makefile
+      - Dockerfile
+      - build-guest.sh
       - crates/circuits/types/**/*
       - crates/circuits/chunk-circuit/**/*
       - crates/circuits/batch-circuit/**/*

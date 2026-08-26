@@ -32,3 +32,8 @@ host = ["dep:sbv-primitives", "dep:c-kzg"]
 [dev-dependencies]
 c-kzg = { workspace = true }
 rand = { version = "0.9" }
+
+[build-dependencies]
+alloy-primitives = { workspace = true }
+eyre = { workspace = true }
+halo2curves-axiom = "0.7.0"

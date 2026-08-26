@@ -124,7 +124,6 @@ impl BatchInfo {
     ///     batch hash ||
     ///     chain id ||
     ///     withdraw root ||
-    ///     next message index ||
     ///     prev msg queue hash ||
     ///     post msg queue hash
     /// )
@@ -137,7 +136,6 @@ impl BatchInfo {
             .chain(self.batch_hash.as_slice())
             .chain(self.chain_id.to_be_bytes().as_slice())
             .chain(self.withdraw_root.as_slice())
-            .chain(self.next_message_index.to_be_bytes().as_slice())
             .chain(self.prev_msg_queue_hash.as_slice())
             .chain(self.post_msg_queue_hash.as_slice())
             .copied()
@@ -174,6 +172,36 @@ impl BatchInfo {
             .copied()
             .collect()
     }
+
+    /// Public inputs encoded for a batch for Scroll@v11 (Tsuki) is defined as
+    ///
+    /// concat(
+    ///     version ||
+    ///     parent state root ||
+    ///     parent batch hash ||
+    ///     state root ||
+    ///     batch hash ||
+    ///     chain id ||
+    ///     withdraw root ||
+    ///     next message index ||
+    ///     prev msg queue hash ||
+    ///     post msg queue hash
+    /// )
+    pub fn pi_tsuki(&self, version: Version) -> Vec<u8> {
+        std::iter::empty()
+            .chain(&[version.as_version_byte()])
+            .chain(self.parent_state_root.as_slice())
+            .chain(self.parent_batch_hash.as_slice())
+            .chain(self.state_root.as_slice())
+            .chain(self.batch_hash.as_slice())
+            .chain(self.chain_id.to_be_bytes().as_slice())
+            .chain(self.withdraw_root.as_slice())
+            .chain(self.next_message_index.to_be_bytes().as_slice())
+            .chain(self.prev_msg_queue_hash.as_slice())
+            .chain(self.post_msg_queue_hash.as_slice())
+            .copied()
+            .collect()
+    }
 }
 
 pub type VersionedBatchInfo = (BatchInfo, Version);
@@ -186,6 +214,7 @@ impl MultiVersionPublicInputs for BatchInfo {
             (Domain::Scroll, STFVersion::V8) => self.pi_feynman(),
             (Domain::Scroll, STFVersion::V9) => self.pi_galileo(version),
             (Domain::Scroll, STFVersion::V10) => self.pi_galileo_v2(version),
+            (Domain::Scroll, STFVersion::V11) => self.pi_tsuki(version),
             (Domain::Validium, STFVersion::V1) => self.pi_validium(version),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
@@ -205,8 +234,8 @@ impl MultiVersionPublicInputs for BatchInfo {
         assert_eq!(self.parent_batch_hash, prev_pi.batch_hash);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
 
-        // Scroll@v10 commits next_message_index into the PI, so it must not regress.
-        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V10) {
+        // Scroll@v11 commits next_message_index into the PI, so it must not regress.
+        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V11) {
             assert!(
                 self.next_message_index >= prev_pi.next_message_index,
                 "next_message_index must not regress"
@@ -284,31 +313,31 @@ mod tests {
     }
 
     #[test]
-    fn galileov2_batch_pi_layout_commits_next_message_index() {
-        let pi = sample_batch_info(0x0102_0304_0506_0708).pi_galileo_v2(Version::galileo_v2());
+    fn tsuki_batch_pi_layout_commits_next_message_index() {
+        let pi = sample_batch_info(0x0102_0304_0506_0708).pi_tsuki(Version::tsuki());
 
         assert_eq!(pi.len(), 241);
-        assert_eq!(pi[0], Version::galileo_v2().as_version_byte());
+        assert_eq!(pi[0], Version::tsuki().as_version_byte());
         assert_eq!(&pi[169..177], &0x0102_0304_0506_0708u64.to_be_bytes());
         assert_eq!(&pi[177..209], B256::repeat_byte(0x66).as_slice());
     }
 
     #[test]
-    fn galileov2_batch_validate_reports_regression() {
-        let version = Version::galileo_v2();
+    fn tsuki_batch_validate_reports_regression() {
+        let version = Version::tsuki();
         let prev = sample_batch_info(22);
         let current = next_contiguous_batch(&prev, 21);
 
         let err = std::panic::catch_unwind(|| current.validate(&prev, version))
-            .expect_err("v10 validation must reject regressions");
+            .expect_err("v11 validation must reject regressions");
 
         let message = panic_message(err);
         assert!(message.contains("next_message_index must not regress"));
     }
 
     #[test]
-    fn pre_v10_batch_validate_ignores_next_message_index_regression() {
-        let version = Version::galileo();
+    fn pre_v11_batch_validate_ignores_next_message_index_regression() {
+        let version = Version::galileo_v2();
         assert_eq!(version.domain, Domain::Scroll);
 
         let prev = sample_batch_info(22);

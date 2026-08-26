@@ -1,7 +1,7 @@
 use crate::{
-    PartialProvingTask, ProverTester, TaskProver, prove_verify, testdata_fork_directory,
-    tester_execute, testers::PATH_TESTDATA, testing_hardfork, testing_version,
-    utils::metadata_from_chunk_witnesses,
+    PartialProvingTask, ProverTester, TaskProver, effective_testdata_fork_directory, prove_verify,
+    testdata_fork_directory, tester_execute, testers::PATH_TESTDATA, testing_hardfork,
+    testing_version, utils::metadata_from_chunk_witnesses,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sbv_core::BlockWitness;
@@ -97,6 +97,14 @@ pub struct ChunkTaskGenerator {
     pub proof: Option<ProofEnum>,
 }
 
+fn initial_prev_message_hash(version: Version) -> B256 {
+    if version.fork == ForkName::Tsuki {
+        B256::ZERO
+    } else {
+        B256::repeat_byte(1u8)
+    }
+}
+
 impl ChunkTaskGenerator {
     pub fn get_or_build_witness(&mut self) -> eyre::Result<ChunkWitness> {
         if let Some(witness) = &self.witness {
@@ -122,7 +130,7 @@ impl ChunkTaskGenerator {
         let dir_name = if self.version.is_validium() {
             "validium"
         } else {
-            self.version.fork.as_str()
+            effective_testdata_fork_directory(self.version.fork)
         };
         let paths: Vec<PathBuf> = self
             .block_range
@@ -163,8 +171,8 @@ impl ChunkTaskGenerator {
                 self.version.as_version_byte(),
                 &block_witnesses,
                 self.prev_message_hash
-                    .unwrap_or_else(|| B256::repeat_byte(1u8)),
-                testing_hardfork(),
+                    .unwrap_or_else(|| initial_prev_message_hash(self.version)),
+                self.version.fork,
             )
         };
 
@@ -191,7 +199,7 @@ pub fn get_witness_from_env_or_builder(
     Ok(ChunkWitness::new_scroll(
         version,
         &block_witnesses,
-        B256::repeat_byte(1u8),
+        initial_prev_message_hash(testing_version()),
         testing_hardfork(),
     ))
 }
@@ -204,6 +212,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
+        ForkName::Tsuki => (Version::tsuki(), 1..=26),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -259,6 +268,14 @@ pub fn create_canonical_tasks(
     Ok(ret)
 }
 
+fn tsuki_golden_chunk_ranges() -> [std::ops::RangeInclusive<u64>; 4] {
+    [1..=8, 9..=16, 17..=20, 21..=26]
+}
+
+pub fn tsuki_golden_chunk_tasks() -> eyre::Result<Vec<ChunkTaskGenerator>> {
+    create_canonical_tasks(Version::tsuki(), tsuki_golden_chunk_ranges().into_iter())
+}
+
 /// preset examples for multiple task
 pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
     let (mut block_range, version) = match testing_hardfork() {
@@ -297,6 +314,10 @@ pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
                 20239242..=20239242,
             ],
             Version::galileo_v2(),
+        ),
+        ForkName::Tsuki => (
+            tsuki_golden_chunk_ranges().into_iter().collect(),
+            Version::tsuki(),
         ),
     };
     // If the BLOCK_RANGE env var has been set, use that instead.
@@ -340,7 +361,7 @@ pub fn exec_chunk(wit: &ChunkWitness) -> eyre::Result<(ExecutionResult, u64)> {
     println!("chunk stats {:#?}", stats);
     let exec_result = tester_execute::<ChunkProverTester>(wit, &[])?;
     let cycle_count = exec_result.total_cycle as u64;
-    let cycle_per_gas = cycle_count / stats.total_gas_used;
+    let cycle_per_gas = cycle_count as f64 / stats.total_gas_used as f64;
     println!(
         "blk {blk}->{}, cycle {cycle_count}, gas {}, cycle-per-gas {cycle_per_gas}",
         wit.blocks.last().unwrap().header.number,
@@ -373,24 +394,15 @@ mod tests {
 
     #[test]
     fn test_presets() {
+        std::env::remove_var("BLOCK_RANGE");
+
         let single = preset_chunk();
-        assert_eq!(
-            single.block_range,
-            (20239240u64..=20239245).collect::<Vec<u64>>(),
-        );
+        assert_eq!(single.block_range, (1u64..=26).collect::<Vec<u64>>(),);
         let multiple = preset_chunk_multiple();
-        assert_eq!(
-            multiple[0].block_range,
-            (20239240..=20239240).collect::<Vec<u64>>(),
-        );
-        assert_eq!(
-            multiple[1].block_range,
-            (20239241..=20239241).collect::<Vec<u64>>(),
-        );
-        assert_eq!(
-            multiple[2].block_range,
-            (20239242..=20239242).collect::<Vec<u64>>(),
-        );
+        assert_eq!(multiple[0].block_range, (1..=8).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[1].block_range, (9..=16).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[2].block_range, (17..=20).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[3].block_range, (21..=26).collect::<Vec<u64>>(),);
 
         // After setting env var.
         std::env::set_var("BLOCK_RANGE", "123..=321");
@@ -398,22 +410,11 @@ mod tests {
             preset_chunk().block_range,
             (123..=321).collect::<Vec<u64>>()
         );
-        std::env::set_var(
-            "BLOCK_RANGE",
-            "20239240..=20239241,20239242..=20239243,20239244..=20239245",
-        );
+        std::env::set_var("BLOCK_RANGE", "1..=2,3..=4,5..=6");
         let multiple = preset_chunk_multiple();
-        assert_eq!(
-            multiple[0].block_range,
-            (20239240u64..=20239241u64).collect::<Vec<u64>>()
-        );
-        assert_eq!(
-            multiple[1].block_range,
-            (20239242u64..=20239243u64).collect::<Vec<u64>>()
-        );
-        assert_eq!(
-            multiple[2].block_range,
-            (20239244u64..=20239245u64).collect::<Vec<u64>>()
-        );
+        assert_eq!(multiple[0].block_range, (1u64..=2u64).collect::<Vec<u64>>());
+        assert_eq!(multiple[1].block_range, (3u64..=4u64).collect::<Vec<u64>>());
+        assert_eq!(multiple[2].block_range, (5u64..=6u64).collect::<Vec<u64>>());
+        std::env::remove_var("BLOCK_RANGE");
     }
 }

@@ -70,7 +70,7 @@ impl From<&ReferenceHeader> for LastHeader {
     fn from(value: &ReferenceHeader) -> Self {
         match value {
             ReferenceHeader::V6(h) => h.into(),
-            ReferenceHeader::V7_V8_V9(h) => h.into(),
+            ReferenceHeader::V7_V8_V9_V10(h) => h.into(),
             ReferenceHeader::V8(_) => {
                 unreachable!("Unexpected ReferenceHeader::V8 from 0.7.0 onwards")
             }
@@ -299,9 +299,13 @@ pub fn build_batch_witnesses(
                 blob_data_proof: point_evaluations.map(|u| B256::new(u.to_be_bytes())),
             })
         }
-        ForkName::EuclidV2 | ForkName::Feynman | ForkName::Galileo | ForkName::GalileoV2 => {
+        ForkName::EuclidV2
+        | ForkName::Feynman
+        | ForkName::Galileo
+        | ForkName::GalileoV2
+        | ForkName::Tsuki => {
             use scroll_zkvm_types::scroll::batch::BatchHeaderV7;
-            ReferenceHeader::V7_V8_V9(BatchHeaderV7 {
+            ReferenceHeader::V7_V8_V9_V10(BatchHeaderV7 {
                 version: last_header.version,
                 batch_index: last_header.batch_index + 1,
                 parent_batch_hash: last_header.batch_hash,
@@ -413,29 +417,23 @@ pub fn build_batch_witnesses_validium(
 #[test]
 fn test_build_and_parse_batch_task() -> eyre::Result<()> {
     use crate::testers::chunk::ChunkTaskGenerator;
-    use scroll_zkvm_types::scroll::batch::{self, Envelope, Payload};
+    use scroll_zkvm_types::{
+        public_inputs::Version,
+        scroll::batch::{self, Envelope, Payload},
+    };
 
-    let witness = match testing_hardfork() {
-        ForkName::EuclidV2 => ChunkTaskGenerator {
-            block_range: (1..=4).collect(),
-            ..Default::default()
-        },
-        ForkName::EuclidV1 => ChunkTaskGenerator {
-            block_range: (12508460..=12508463).collect(),
-            ..Default::default()
-        },
-        ForkName::Feynman => ChunkTaskGenerator {
-            block_range: (16525000..=16525003).collect(),
-            ..Default::default()
-        },
-        ForkName::Galileo => ChunkTaskGenerator {
-            block_range: (20239156..=20239192).collect(),
-            ..Default::default()
-        },
-        ForkName::GalileoV2 => ChunkTaskGenerator {
-            block_range: (20239240..=20239245).collect(),
-            ..Default::default()
-        },
+    let (version, block_range) = match testing_hardfork() {
+        ForkName::EuclidV2 => (Version::euclid_v2(), 1u64..=4),
+        ForkName::EuclidV1 => (Version::euclid_v1(), 12508460u64..=12508463),
+        ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003),
+        ForkName::Galileo => (Version::galileo(), 20239156u64..=20239192),
+        ForkName::GalileoV2 => (Version::galileo_v2(), 20239240u64..=20239245),
+        ForkName::Tsuki => (Version::tsuki(), 1..=26),
+    };
+    let witness = ChunkTaskGenerator {
+        version,
+        block_range: block_range.collect(),
+        ..Default::default()
     }
     .get_or_build_witness()?;
 
@@ -454,7 +452,7 @@ fn test_build_and_parse_batch_task() -> eyre::Result<()> {
             let enveloped = batch::EnvelopeV6::from_slice(&task_wit.blob_bytes);
             <batch::PayloadV6 as Payload>::from_envelope(&enveloped).validate(h, infos);
         }
-        ReferenceHeader::V7_V8_V9(h) => {
+        ReferenceHeader::V7_V8_V9_V10(h) => {
             let enveloped = batch::EnvelopeV7::from_slice(&task_wit.blob_bytes);
             <batch::PayloadV7 as Payload>::from_envelope(&enveloped).validate(h, infos);
         }

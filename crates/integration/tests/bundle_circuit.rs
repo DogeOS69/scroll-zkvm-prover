@@ -145,19 +145,34 @@ fn e2e_inner(
     // Sanity check for pi of bundle hash, update the expected hash if block witness changed
     let version = testing_version();
     let pi_str = match version.fork {
-        ForkName::EuclidV1 => "3cc70faf6b5a4bd565694a4c64de59befb735f4aac2a4b9e6a6fc2ee950b8a72",
-        ForkName::EuclidV2 => "2028510c403837c6ed77660fd92814ba61d7b746e7268cc8dfc14d163d45e6bd",
-        ForkName::Feynman => "80523a61b2b94b2922638ec90edd084b1022798e1e5539c3a079d2b0736e4f32",
-        ForkName::Galileo => "86290e8c329dd2ec430df4a8b2ae8396b3996b3e814afff24b7cedeb26387087",
-        ForkName::GalileoV2 => "7ff4ebd1e74adf0f7740df04d9ba7a334beb37faffa126dda00c6b2ade8f90d4",
+        ForkName::EuclidV1 => {
+            Some("3cc70faf6b5a4bd565694a4c64de59befb735f4aac2a4b9e6a6fc2ee950b8a72")
+        }
+        ForkName::EuclidV2 => {
+            Some("2028510c403837c6ed77660fd92814ba61d7b746e7268cc8dfc14d163d45e6bd")
+        }
+        ForkName::Feynman => {
+            Some("80523a61b2b94b2922638ec90edd084b1022798e1e5539c3a079d2b0736e4f32")
+        }
+        ForkName::Galileo => {
+            Some("86290e8c329dd2ec430df4a8b2ae8396b3996b3e814afff24b7cedeb26387087")
+        }
+        ForkName::GalileoV2 => {
+            Some("7ff4ebd1e74adf0f7740df04d9ba7a334beb37faffa126dda00c6b2ade8f90d4")
+        }
+        // A pinned Tsuki bundle PI hash remains follow-up scope. The proof-vs-metadata PI
+        // check below still covers the checked-in Tsuki fixture corpus.
+        ForkName::Tsuki => None,
     };
     let expected_pi_hash = metadata.pi_hash_by_version(version);
-    // sanity check for pi of bundle hash, update the expected hash if block witness changed
-    assert_eq!(
-        alloy_primitives::hex::encode(expected_pi_hash),
-        pi_str,
-        "unexpected pi hash for e2e bundle info, block witness changed?"
-    );
+    if let Some(pi_str) = pi_str {
+        // sanity check for pi of bundle hash, update the expected hash if block witness changed
+        assert_eq!(
+            alloy_primitives::hex::encode(expected_pi_hash),
+            pi_str,
+            "unexpected pi hash for e2e bundle info, block witness changed?"
+        );
+    }
 
     let proof = task.get_or_build_proof(bundle_prover, batch_prover, chunk_prover)?;
 

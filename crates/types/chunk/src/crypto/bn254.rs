@@ -246,8 +246,18 @@ mod test {
     use super::*;
     use hex_literal::hex;
     use sbv_primitives::{
-        B256,
-        types::{reth::evm::revm, revm::precompile::PrecompileOutput},
+        Address, B256, U256,
+        types::{
+            evm::precompiles::{Precompile, PrecompileInput},
+            reth::evm::{
+                EvmInternals,
+                revm::{Context, MainContext, context::CfgEnv},
+            },
+            revm::{
+                ScrollPrecompileProvider, SpecId,
+                precompile::{PrecompileOutput, PrecompileResult, bn254},
+            },
+        },
     };
 
     const G1_IDENTITY: [u8; 64] = [0u8; 64];
@@ -277,25 +287,43 @@ mod test {
         assert!(read_g2_point(&G2_POINT_2).is_ok());
     }
 
+    fn call_dyn_precompile(
+        precompile: impl Precompile,
+        address: Address,
+        input: &[u8],
+        gas: u64,
+    ) -> PrecompileResult {
+        let mut ctx = Context::mainnet().with_cfg(CfgEnv::new_with_spec(SpecId::GALILEO));
+
+        precompile.call(PrecompileInput {
+            data: input,
+            gas,
+            caller: Address::ZERO,
+            value: U256::ZERO,
+            is_static: false,
+            internals: EvmInternals::from_context(&mut ctx),
+            target_address: address,
+            bytecode_address: address,
+        })
+    }
+
     #[test]
     fn test_pairing_check_non_matching() {
         // 1. pairing check in zkVM.
-        let zkvm_res = super::pairing_check(&[(&G1_IDENTITY, &G2_NON_SUBGROUP)]);
+        let zkvm_res = pairing_check(&[(&G1_IDENTITY, &G2_NON_SUBGROUP)]);
 
         // 2. pairing check in revm.
         let revm_res = {
-            let provider = sbv_primitives::types::revm::ScrollPrecompileProvider::new_with_spec(
+            let provider = ScrollPrecompileProvider::new_with_spec(
                 sbv_primitives::types::revm::SpecId::GALILEO,
-            );
-            let precompile = provider
-                .precompiles()
-                .get(&revm::precompile::bn254::pair::ADDRESS)
-                .expect("should be ok");
+            )
+            .into_precompiles_map();
+            let precompile = provider.get(&bn254::pair::ADDRESS).expect("should be ok");
             let input = std::iter::empty()
                 .chain(G1_IDENTITY)
                 .chain(G2_NON_SUBGROUP)
                 .collect::<Vec<u8>>();
-            precompile.execute(input.as_slice(), 500_000)
+            call_dyn_precompile(precompile, bn254::pair::ADDRESS, &input, 500_000)
         };
 
         // G1 is identity element, however G2 is point on curve that is *not* in subgroup.
@@ -311,25 +339,20 @@ mod test {
     #[test]
     fn test_pairing_check_matching() {
         // 1. pairing check in zkVM.
-        let zkvm_res =
-            super::pairing_check(&[(&G1_POINT_1, &G2_POINT_1), (&G1_POINT_2, &G2_POINT_2)]);
+        let zkvm_res = pairing_check(&[(&G1_POINT_1, &G2_POINT_1), (&G1_POINT_2, &G2_POINT_2)]);
 
         // 2. pairing check in revm.
         let revm_res = {
-            let provider = sbv_primitives::types::revm::ScrollPrecompileProvider::new_with_spec(
-                sbv_primitives::types::revm::SpecId::GALILEO,
-            );
-            let precompile = provider
-                .precompiles()
-                .get(&revm::precompile::bn254::pair::ADDRESS)
-                .expect("should be ok");
+            let provider =
+                ScrollPrecompileProvider::new_with_spec(SpecId::GALILEO).into_precompiles_map();
+            let precompile = provider.get(&bn254::pair::ADDRESS).expect("should be ok");
             let input = std::iter::empty()
                 .chain(G1_POINT_1)
                 .chain(G2_POINT_1)
                 .chain(G1_POINT_2)
                 .chain(G2_POINT_2)
                 .collect::<Vec<u8>>();
-            precompile.execute(input.as_slice(), 500_000)
+            call_dyn_precompile(precompile, bn254::pair::ADDRESS, &input, 500_000)
         };
 
         // Here we have both G1 and G2 points valid, i.e. on curve and in the subgroup.
@@ -338,6 +361,7 @@ mod test {
         assert_eq!(zkvm_res.ok(), Some(true));
         let Some(PrecompileOutput {
             gas_used: _gas_used,
+            gas_refunded: _gas_refunded,
             bytes,
             reverted: _reverted,
         }) = revm_res.ok()

@@ -7,7 +7,7 @@ export RUST_BACKTRACE
 RUST_LOG ?= off,scroll_zkvm_integration=debug,scroll_zkvm_verifier=debug,scroll_zkvm_prover=debug,p3_fri=warn,p3_dft=warn,openvm_circuit=warn
 export RUST_LOG
 
-OPENVM_RUST_TOOLCHAIN ?= nightly-2025-08-18
+OPENVM_RUST_TOOLCHAIN ?= nightly-2026-03-17
 export OPENVM_RUST_TOOLCHAIN
 
 # Set GPU config if GPU=1 is set
@@ -37,7 +37,7 @@ fmt:
 
 clippy:
 	@cargo clippy --tests --manifest-path crates/types/Cargo.toml -- -D warnings
-	sh openvm-clippy.sh
+	bash openvm-clippy.sh
 	@cargo clippy --tests --all-features --manifest-path crates/verifier/Cargo.toml -- -D warnings
 	@cargo clippy --tests --manifest-path crates/prover/Cargo.toml -- -D warnings
 	@cargo clippy --tests --manifest-path crates/integration/Cargo.toml -- -D warnings
@@ -65,6 +65,14 @@ test-execute-chunk:
 
 test-execute-chunk-multi:
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test chunk_circuit test_execute_multi -- --exact --nocapture
+
+test-tsuki-golden:
+	@if command -v sha256sum >/dev/null 2>&1; then cd crates/integration/testdata/tsuki && sha256sum -c SHA256SUMS; else cd crates/integration/testdata/tsuki && shasum -a 256 -c SHA256SUMS; fi
+	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test chunk_circuit test_tsuki -- --nocapture
+	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test batch_circuit test_tsuki_golden_batch_metadata -- --exact --nocapture
+	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test batch_circuit verify_batch_hash_invariant -- --exact --nocapture
+	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration test_build_and_parse_batch_task -- --nocapture
+	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration testers::chunk::tests::test_presets -- --exact --nocapture
 
 test-execute-validium-chunk:
 	@cargo test --release -p scroll-zkvm-integration --test chunk_circuit test_execute_validium -- --exact --nocapture

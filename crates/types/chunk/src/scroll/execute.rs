@@ -27,16 +27,19 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         .expect("witnesses can not be empty")
         .header
         .hash_slow();
-    let chain_spec = build_chain_spec_force_hardfork(
-        chain,
-        match witness.fork_name {
-            ForkName::EuclidV1 => Hardfork::Euclid,
-            ForkName::EuclidV2 => Hardfork::EuclidV2,
-            ForkName::Feynman => Hardfork::Feynman,
-            ForkName::Galileo => Hardfork::Galileo,
-            ForkName::GalileoV2 => Hardfork::GalileoV2,
-        },
-    );
+    let hardfork = match witness.fork_name {
+        ForkName::EuclidV1 | ForkName::EuclidV2 => {
+            return Err(format!(
+                "{} is no longer supported by the Feynman+ DogeOS execution client",
+                witness.fork_name
+            ));
+        }
+        ForkName::Feynman => Hardfork::Feynman,
+        ForkName::Galileo => Hardfork::Galileo,
+        ForkName::GalileoV2 => Hardfork::GalileoV2,
+        ForkName::Tsuki => Hardfork::Tsuki,
+    };
+    let chain_spec = build_chain_spec_force_hardfork(chain, hardfork);
 
     let VerifyResult {
         blocks,

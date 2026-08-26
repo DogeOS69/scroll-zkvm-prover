@@ -15,7 +15,7 @@ openvm-build = { workspace = true, default-features = false }
 eyre.workspace = true
 hex.workspace = true
 serde_json.workspace = true
-snark-verifier-sdk.workspace = true
+snark-verifier-sdk = { workspace = true, features = ["loader_evm"] }
 toml.workspace = true
 
 cargo_metadata.workspace = true
