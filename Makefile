@@ -37,7 +37,7 @@ fmt:
 
 clippy:
 	@cargo clippy --tests --manifest-path crates/types/Cargo.toml -- -D warnings
-	sh openvm-clippy.sh
+	bash openvm-clippy.sh
 	@cargo clippy --tests --all-features --manifest-path crates/verifier/Cargo.toml -- -D warnings
 	@cargo clippy --tests --manifest-path crates/prover/Cargo.toml -- -D warnings
 	@cargo clippy --tests --manifest-path crates/integration/Cargo.toml -- -D warnings
