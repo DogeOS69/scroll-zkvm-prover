@@ -169,7 +169,7 @@ fn test_tsuki_golden_batch_metadata() -> eyre::Result<()> {
     );
     assert_eq!(
         info.pi_hash_by_version(Version::tsuki()),
-        b256!("61a7f518bff28cb6e973af222e19ffdcef4dc7edeb30bff851650ddc0eab1773")
+        b256!("f2e2bce630d2991ae1dc8dd95101f718d35b72b569e1596551b0c2079a1e5c39")
     );
 
     Ok(())

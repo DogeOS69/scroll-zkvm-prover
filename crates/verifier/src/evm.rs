@@ -69,12 +69,14 @@ fn deploy_and_call(deployment_code: Vec<u8>, calldata: Vec<u8>) -> Result<u64, S
             output: revm::context::result::Output::Create(_, Some(contract)),
             ..
         } => contract,
-        ExecutionResult::Revert { gas_used, output } => {
+        ExecutionResult::Revert { gas, output, .. } => {
+            let gas_used = gas.used();
             return Err(format!(
                 "Contract deployment transaction reverts with gas_used {gas_used} and output {output:#x}"
             ));
         }
-        ExecutionResult::Halt { reason, gas_used } => {
+        ExecutionResult::Halt { reason, gas, .. } => {
+            let gas_used = gas.used();
             return Err(format!(
                 "Contract deployment transaction halts unexpectedly with gas_used {gas_used} and reason {reason:?}"
             ));
@@ -92,12 +94,14 @@ fn deploy_and_call(deployment_code: Vec<u8>, calldata: Vec<u8>) -> Result<u64, S
         })
         .map_err(|err| format!("Contract call transaction failed: {err:?}"))?;
     match result {
-        ExecutionResult::Success { gas_used, .. } => Ok(gas_used),
-        ExecutionResult::Revert { gas_used, output } => Err(format!(
-            "Contract call transaction reverts with gas_used {gas_used} and output {output:#x}"
+        ExecutionResult::Success { gas, .. } => Ok(gas.used()),
+        ExecutionResult::Revert { gas, output, .. } => Err(format!(
+            "Contract call transaction reverts with gas_used {} and output {output:#x}",
+            gas.used()
         )),
-        ExecutionResult::Halt { reason, gas_used } => Err(format!(
-            "Contract call transaction halts unexpectedly with gas_used {gas_used} and reason {reason:?}"
+        ExecutionResult::Halt { reason, gas, .. } => Err(format!(
+            "Contract call transaction halts unexpectedly with gas_used {} and reason {reason:?}",
+            gas.used()
         )),
     }
 }

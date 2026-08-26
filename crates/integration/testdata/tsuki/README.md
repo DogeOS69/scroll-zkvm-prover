@@ -124,7 +124,12 @@ between otherwise equivalent dumps, so `SHA256SUMS` records the exact checked-in
 bytes. `make test-tsuki-golden` verifies those checksums before the integration
 tests pin the consensus roots and public-input hashes.
 
-## OpenVM proof identity
+## Historical OpenVM proof identity (pre-#19)
+
+The identities in this section were produced before the Reth/REVM/SBV upgrade in
+#19. They document the original DOG-424 proving run, but they are not compatible
+with the current `feat/tsuki-hardfork` host or guest source and must not be used
+to validate this PR after merging that branch.
 
 The compatible OpenVM 1.7 guests were rebuilt from a clean checkout of
 `b38e0dc440be76ce6ad75080b1524429a758adae` on Linux with `solc 0.8.19` and
@@ -168,3 +173,26 @@ GUEST_VERSION=dogeos-openvm17-tsuki-dog424 make test-execute-chunk-multi
 GUEST_VERSION=dogeos-openvm17-tsuki-dog424 make test-execute-batch
 GUEST_VERSION=dogeos-openvm17-tsuki-dog424 make test-e2e-batch
 ```
+
+## Current-head validation
+
+After merging `feat/tsuki-hardfork` at `6f1c80d8e2f343a66455677daf33bc912768e180`,
+the corpus was replayed with the upgraded Reth/REVM/SBV dependency set. All 26
+checksums, four native chunk state transitions, batch metadata, the batch hash
+invariant, and batch task construction passed. The expected chunk and batch
+public-input hashes were updated because #19 corrected Tsuki's initial message
+queue hash from `0x01..01` to `0x00..00`.
+
+A fresh OpenVM 1.7 chunk guest was also built with
+`nightly-2026-03-17` and `solc 0.8.19`:
+
+- chunk `app.vmexe` SHA-256:
+  `e71a0b0caae08ca756d8366a00e67726426e95335484fa468f9ae3ddaf4ab9ae`;
+- chunk program commitment:
+  `3e2d80469c0f2508330a076a3535fc6201c29353c2788b18b29eb9015cd734763bfd2f7624b51c513cb6873df01bfa673e3e2d24205a3868016c6464ef8a694b`.
+
+That guest successfully executed all four golden chunks (`1..=8`, `9..=16`,
+`17..=20`, and `21..=26`) without unresolved MPT access. This was a local
+diagnostic build only: it does not replace the repository's canonical guest
+commitments or satisfy the release gate for rebuilding and testing chunk, batch,
+and bundle assets through the containerized path.

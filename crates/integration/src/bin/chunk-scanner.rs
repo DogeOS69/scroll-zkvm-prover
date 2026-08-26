@@ -114,9 +114,7 @@ async fn main() -> eyre::Result<()> {
         ))
         .layer(ThrottleLayer::new(cli.requests_per_second))
         .http(cli.rpc_url);
-    let provider = ProviderBuilder::<_, _, Network>::default()
-        .with_recommended_fillers()
-        .connect_client(client);
+    let provider = ProviderBuilder::<_, _, Network>::default().connect_client(client);
 
     let compare_with: Option<HashMap<(u64, u64), Stats>> = cli
         .compare_with

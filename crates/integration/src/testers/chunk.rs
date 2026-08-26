@@ -97,6 +97,14 @@ pub struct ChunkTaskGenerator {
     pub proof: Option<ProofEnum>,
 }
 
+fn initial_prev_message_hash(version: Version) -> B256 {
+    if version.fork == ForkName::Tsuki {
+        B256::ZERO
+    } else {
+        B256::repeat_byte(1u8)
+    }
+}
+
 impl ChunkTaskGenerator {
     pub fn get_or_build_witness(&mut self) -> eyre::Result<ChunkWitness> {
         if let Some(witness) = &self.witness {
@@ -163,8 +171,8 @@ impl ChunkTaskGenerator {
                 self.version.as_version_byte(),
                 &block_witnesses,
                 self.prev_message_hash
-                    .unwrap_or_else(|| B256::repeat_byte(1u8)),
-                testing_hardfork(),
+                    .unwrap_or_else(|| initial_prev_message_hash(self.version)),
+                self.version.fork,
             )
         };
 
@@ -191,7 +199,7 @@ pub fn get_witness_from_env_or_builder(
     Ok(ChunkWitness::new_scroll(
         version,
         &block_witnesses,
-        B256::repeat_byte(1u8),
+        initial_prev_message_hash(testing_version()),
         testing_hardfork(),
     ))
 }
@@ -407,7 +415,6 @@ mod tests {
         assert_eq!(multiple[0].block_range, (1u64..=2u64).collect::<Vec<u64>>());
         assert_eq!(multiple[1].block_range, (3u64..=4u64).collect::<Vec<u64>>());
         assert_eq!(multiple[2].block_range, (5u64..=6u64).collect::<Vec<u64>>());
-
         std::env::remove_var("BLOCK_RANGE");
     }
 }

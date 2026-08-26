@@ -1,0 +1,25 @@
+{
+  "feature": "next-message-index",
+  "description": "First committed real-Tsuki fixture for the next_message_index overlay: threaded from the patched stateless-block-verifier into ChunkInfo/BatchInfo and committed into Tsuki (Scroll@v11) public inputs. These blocks carry no L1 messages, so next_message_index is expected to stay 0 (constant, non-advancing case).",
+  "fork_name": "Tsuki",
+  "chain_id": 6281971,
+  "block_start": 11,
+  "block_end": 13,
+  "prev_msg_queue_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_next_message_index": 0,
+  "provenance": {
+    "l2": "DogeOS Tsuki-era L2 (chain_id 6281971)",
+    "source": "blocks[] array extracted from a Tsuki materializer chunk-witness",
+    "chunk_witness_file": "coordinator-staging/witnesses/0x0ab254dff.../scroll-chunk-witness-8654153dc2165857b7909a11d6113503e6d320cadc6f22a3aaecee975bc8e3bf.json",
+    "run": "tsuki-definitive-6a13b33f-vast-retry-20260714T011747Z",
+    "run_date": "2026-07-14",
+    "run_sbv_rev": "ec6059bd",
+    "branch_sbv_rev": "ec6059bd",
+    "stacked_on_pr": "DogeOS69/scroll-zkvm-prover#9 (feat/tsuki-hardfork, adds ForkName::Tsuki + Version::tsuki())",
+    "witness_sha256": {
+      "11.json": "e076dd8c56a7320ce3b0c0cf623409d6ef88887c8925551441f7a28de3b1b134",
+      "12.json": "0eb289270eb75f240d66dd68adda6f7440647cc8aa0b2df1f18f752d50038afe",
+      "13.json": "c5409b760753723501632c46efdc72227ad803b17b26f81a4ece4178f4ec3979"
+    }
+  }
+}
