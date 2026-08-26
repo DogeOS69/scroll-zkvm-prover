@@ -34,10 +34,10 @@ This project uses **OpenVM** as its ZKVM. Guest executables (`.vmexe`) and host 
    cargo run --release -p scroll-zkvm-build-guest -- --mode force
    ```
    This regenerates: `app.elf`, `app.vmexe`, `root_verifier.asm`, commitment `.rs` files, and `openVmVk.json`.
-   The build tool pins `OPENVM_RUST_TOOLCHAIN=nightly-2025-08-18`; an explicit
-   conflicting override fails instead of silently generating a different
-   executable commitment. Use `make build-guest` before committing generated
-   commitments so the result matches the Dockerized CI build path.
+   The build defaults `OPENVM_RUST_TOOLCHAIN` to `nightly-2026-03-17`. Set that
+   environment variable explicitly to select a different guest compiler; doing
+   so changes the executable commitment. Use `make build-guest` before committing
+   generated commitments so the result matches the Dockerized CI build path.
 
 3. **Verify commitments were updated** — check that `*_exe_commit.rs` and `*_vm_commit.rs` files changed, and that `openVmVk.json` timestamps are fresh.
 

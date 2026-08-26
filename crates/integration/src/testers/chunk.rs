@@ -97,6 +97,14 @@ pub struct ChunkTaskGenerator {
     pub proof: Option<ProofEnum>,
 }
 
+fn initial_prev_message_hash(version: Version) -> B256 {
+    if version.fork == ForkName::Tsuki {
+        B256::ZERO
+    } else {
+        B256::repeat_byte(1u8)
+    }
+}
+
 impl ChunkTaskGenerator {
     pub fn get_or_build_witness(&mut self) -> eyre::Result<ChunkWitness> {
         if let Some(witness) = &self.witness {
@@ -163,8 +171,8 @@ impl ChunkTaskGenerator {
                 self.version.as_version_byte(),
                 &block_witnesses,
                 self.prev_message_hash
-                    .unwrap_or_else(|| B256::repeat_byte(1u8)),
-                testing_hardfork(),
+                    .unwrap_or_else(|| initial_prev_message_hash(self.version)),
+                self.version.fork,
             )
         };
 
@@ -191,7 +199,7 @@ pub fn get_witness_from_env_or_builder(
     Ok(ChunkWitness::new_scroll(
         version,
         &block_witnesses,
-        B256::repeat_byte(1u8),
+        initial_prev_message_hash(testing_version()),
         testing_hardfork(),
     ))
 }
@@ -204,8 +212,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
-        // Reuse the checked-in GalileoV2 fixture window until dedicated Tsuki fixtures land.
-        ForkName::Tsuki => (Version::tsuki(), 20239240..=20239245),
+        ForkName::Tsuki => (Version::tsuki(), 11..=13),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -300,13 +307,10 @@ pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
             ],
             Version::galileo_v2(),
         ),
-        // Reuse the checked-in GalileoV2 fixture window until dedicated Tsuki fixtures land.
         ForkName::Tsuki => (
-            vec![
-                20239240..=20239240,
-                20239241..=20239241,
-                20239242..=20239242,
-            ],
+            // These witnesses were extracted from one chunk and share de-duplicated trie nodes,
+            // so they cannot be executed as independent per-block chunks.
+            vec![11..=13],
             Version::tsuki(),
         ),
     };
@@ -385,23 +389,10 @@ mod tests {
     #[test]
     fn test_presets() {
         let single = preset_chunk();
-        assert_eq!(
-            single.block_range,
-            (20239240u64..=20239245).collect::<Vec<u64>>(),
-        );
+        assert_eq!(single.block_range, (11u64..=13).collect::<Vec<u64>>(),);
         let multiple = preset_chunk_multiple();
-        assert_eq!(
-            multiple[0].block_range,
-            (20239240..=20239240).collect::<Vec<u64>>(),
-        );
-        assert_eq!(
-            multiple[1].block_range,
-            (20239241..=20239241).collect::<Vec<u64>>(),
-        );
-        assert_eq!(
-            multiple[2].block_range,
-            (20239242..=20239242).collect::<Vec<u64>>(),
-        );
+        assert_eq!(multiple[0].block_range, (11..=13).collect::<Vec<u64>>(),);
+        assert_eq!(multiple.len(), 1);
 
         // After setting env var.
         std::env::set_var("BLOCK_RANGE", "123..=321");
@@ -409,22 +400,13 @@ mod tests {
             preset_chunk().block_range,
             (123..=321).collect::<Vec<u64>>()
         );
-        std::env::set_var(
-            "BLOCK_RANGE",
-            "20239240..=20239241,20239242..=20239243,20239244..=20239245",
-        );
+        std::env::set_var("BLOCK_RANGE", "11..=13");
         let multiple = preset_chunk_multiple();
         assert_eq!(
             multiple[0].block_range,
-            (20239240u64..=20239241u64).collect::<Vec<u64>>()
+            (11u64..=13u64).collect::<Vec<u64>>()
         );
-        assert_eq!(
-            multiple[1].block_range,
-            (20239242u64..=20239243u64).collect::<Vec<u64>>()
-        );
-        assert_eq!(
-            multiple[2].block_range,
-            (20239244u64..=20239245u64).collect::<Vec<u64>>()
-        );
+        assert_eq!(multiple.len(), 1);
+        std::env::remove_var("BLOCK_RANGE");
     }
 }

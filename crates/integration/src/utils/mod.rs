@@ -428,8 +428,7 @@ fn test_build_and_parse_batch_task() -> eyre::Result<()> {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003),
         ForkName::Galileo => (Version::galileo(), 20239156u64..=20239192),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240u64..=20239245),
-        // Dedicated Tsuki fixtures are not checked in yet; reuse the GalileoV2 fixture window.
-        ForkName::Tsuki => (Version::tsuki(), 20239240u64..=20239245),
+        ForkName::Tsuki => (Version::tsuki(), 11u64..=13),
     };
     let witness = ChunkTaskGenerator {
         version,

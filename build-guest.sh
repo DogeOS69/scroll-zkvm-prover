@@ -5,7 +5,9 @@ mkdir -p releases
 #rm -rf releases/*
 
 # build docker image
-docker build --platform linux/amd64 -t build-guest:local .
+docker build --platform linux/amd64 \
+  --build-arg OPENVM_RUST_TOOLCHAIN="${OPENVM_RUST_TOOLCHAIN}" \
+  -t build-guest:local .
 
 # cleanup function
 cleanup() {
@@ -21,7 +23,9 @@ cleanup() {
 trap cleanup EXIT
 
 # run docker image
-docker run --cidfile ./build-guest.cid --platform linux/amd64 build-guest:local make build-guest-local
+docker run --cidfile ./build-guest.cid --platform linux/amd64 \
+  -e OPENVM_RUST_TOOLCHAIN="${OPENVM_RUST_TOOLCHAIN}" \
+  build-guest:local make build-guest-local
 container_id=$(cat ./build-guest.cid)
 
 # copy vm commitments from container to local

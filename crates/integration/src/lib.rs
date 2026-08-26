@@ -46,7 +46,7 @@ pub fn testing_hardfork() -> ForkName {
 
 /// Test settings (version).
 pub fn testing_version() -> Version {
-    Version::galileo_v2()
+    Version::tsuki()
 }
 
 pub fn testing_version_validium() -> Version {
@@ -260,15 +260,7 @@ impl TaskProver for Prover {
 /// Testdata fixture directory for a fork.
 pub fn effective_testdata_fork_directory(fork: ForkName) -> &'static str {
     match fork {
-        // Dedicated Tsuki fixtures are not checked in yet. Use the latest checked-in Scroll
-        // fixture window only until testdata/tsuki exists.
-        ForkName::Tsuki
-            if !Path::new(testers::PATH_TESTDATA)
-                .join(ForkName::Tsuki.as_str())
-                .exists() =>
-        {
-            ForkName::GalileoV2.as_str()
-        }
+        ForkName::Tsuki => "dogeos/next-message-index",
         fork => fork.as_str(),
     }
 }
