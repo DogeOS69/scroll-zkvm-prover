@@ -9,7 +9,11 @@ use openvm_native_circuit::NativeCpuBuilder as NativeBuilder;
 use openvm_native_circuit::NativeGpuBuilder as NativeBuilder;
 
 use openvm_circuit::arch::instructions::exe::VmExe;
-use openvm_sdk::{DefaultStarkEngine, config::SdkVmBuilder};
+use openvm_sdk::{
+    DefaultStarkEngine,
+    config::SdkVmBuilder,
+    keygen::{AggProvingKey, AggVerifyingKey},
+};
 use openvm_sdk::{
     F, Sdk, StdIn,
     config::{AppConfig, SdkVmConfig},
@@ -43,6 +47,9 @@ pub struct Prover {
     sdk: OnceLock<Sdk>,
     /// Lazily initialized stark prover
     prover: OnceLock<StarkProver<DefaultStarkEngine, SdkVmBuilder, NativeBuilder>>,
+    /// Optional caller-owned canonical aggregation key. `None` preserves the
+    /// legacy lazy `AGG_STARK_PROVING_KEY` path.
+    external_agg_pk: Option<AggProvingKey>,
 }
 
 /// Configure the [`Prover`].
@@ -62,6 +69,31 @@ impl Prover {
     /// Setup the [`Prover`] given paths to the application's exe and proving key.
     #[instrument("Prover::setup")]
     pub fn setup(config: ProverConfig, name: Option<&str>) -> Result<Self, Error> {
+        Self::setup_inner(config, name, None)
+    }
+
+    /// Setup the prover with an externally owned aggregation proving key.
+    ///
+    /// The supplied key is checked against the caller's expected aggregation
+    /// verifying key before any SDK or app prover is initialized. Both proving
+    /// and post-prove verification then use this key, so this path never
+    /// initializes [`AGG_STARK_PROVING_KEY`].
+    #[instrument("Prover::setup_with_agg_pk", skip_all)]
+    pub fn setup_with_agg_pk(
+        config: ProverConfig,
+        name: Option<&str>,
+        agg_pk: AggProvingKey,
+        expected_agg_vk: &AggVerifyingKey,
+    ) -> Result<Self, Error> {
+        validate_external_agg_pk(&agg_pk, expected_agg_vk)?;
+        Self::setup_inner(config, name, Some(agg_pk))
+    }
+
+    fn setup_inner(
+        config: ProverConfig,
+        name: Option<&str>,
+        external_agg_pk: Option<AggProvingKey>,
+    ) -> Result<Self, Error> {
         let mut app_config = read_app_config(&config.path_app_config)?;
         let segment_len = config.segment_len.unwrap_or(DEFAULT_SEGMENT_SIZE);
         let segmentation_limits = &mut app_config.app_vm_config.system.config.segmentation_limits;
@@ -76,6 +108,7 @@ impl Prover {
             app_config,
             sdk: OnceLock::new(),
             prover: OnceLock::new(),
+            external_agg_pk,
         })
     }
 
@@ -91,8 +124,13 @@ impl Prover {
             tracing::info!("Lazy initializing SDK...");
             let mut sdk = Sdk::new(self.app_config.clone()).expect("sdk init failed");
             sdk.agg_tree_config_mut().num_children_internal = 2;
-            // 45s for first time
-            let sdk = sdk.with_agg_pk(AGG_STARK_PROVING_KEY.clone());
+            // The external path avoids initializing the process-global key.
+            // Existing callers retain the legacy lazy global behavior.
+            let agg_pk = self
+                .external_agg_pk
+                .clone()
+                .unwrap_or_else(|| AGG_STARK_PROVING_KEY.clone());
+            let sdk = sdk.with_agg_pk(agg_pk);
             Ok(sdk)
         })
     }
@@ -227,12 +265,13 @@ impl Prover {
             stat,
         };
         tracing::info!("verifing stark proof");
-        UniversalVerifier::verify_stark_proof_with_vk(
-            &AGG_STARK_PROVING_KEY.get_agg_vk(),
-            &proof,
-            &self.get_app_vk(),
-        )
-        .map_err(|e| Error::VerifyProof(e.to_string()))?;
+        let agg_vk = self
+            .external_agg_pk
+            .as_ref()
+            .map(AggProvingKey::get_agg_vk)
+            .unwrap_or_else(|| AGG_STARK_PROVING_KEY.get_agg_vk());
+        UniversalVerifier::verify_stark_proof_with_vk(&agg_vk, &proof, &self.get_app_vk())
+            .map_err(|e| Error::VerifyProof(e.to_string()))?;
         tracing::info!("verifing stark proof done");
         Ok(proof)
     }
@@ -250,4 +289,21 @@ impl Prover {
 
         Ok(evm_proof)
     }
+}
+
+fn validate_external_agg_pk(
+    agg_pk: &AggProvingKey,
+    expected_agg_vk: &AggVerifyingKey,
+) -> Result<(), Error> {
+    let actual = bincode_v1::serialize(&agg_pk.get_agg_vk())
+        .map_err(|e| Error::Keygen(format!("serialize supplied aggregation verifying key: {e}")))?;
+    let expected = bincode_v1::serialize(expected_agg_vk)
+        .map_err(|e| Error::Keygen(format!("serialize expected aggregation verifying key: {e}")))?;
+    if actual != expected {
+        return Err(Error::Keygen(
+            "externally supplied aggregation proving key does not match expected verifying key"
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
