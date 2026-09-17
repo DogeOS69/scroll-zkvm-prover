@@ -28,3 +28,4 @@ openvm-rv32im-guest= {  workspace = true }
 [features]
 default = ["scroll"]
 scroll = ["scroll-zkvm-types-chunk/scroll"]
+witness-memory-diagnostics = []

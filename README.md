@@ -171,44 +171,41 @@ assert!(verifier.verify_proof_evm(&proof.clone().into_evm_proof().expect("should
 
 ### Form a universal task for a chunk from block witnesses
 
-A universal task for proving a chunk can be easily generated from block witnesses:
+The padded input encoder retains four-byte alignment for code and trie payloads and
+supplies zero padding for legacy bytecode analysis. Use it only with a chunk guest
+built with `SBVPAD01` support and the matching proving key:
 
 ```rust
-use std::path::Path;
-
-use scroll_zkvm_prover::{
-    Prover,
-    task::ProvingTask,
-};
+use sbv_core::BlockWitness;
+use sbv_primitives::B256;
 use scroll_zkvm_types::{
-    public_inputs::ForkName,
-    chunk::ChunkWitness,
+    scroll::chunk::{ChunkWitness, PaddedChunkWitness},
     task::ProvingTask as UniversalProvingTask,
+    version::Version,
 };
 
-let prover = /* init a prover and load the chunk circuit */
-let vk = prover.get_app_vk();
-
-// Proving task of a chunk with 3 blocks.
-let block_witnesses = vec![
-    sbv::primitives::types::BlockWitness { /* */ },
-    sbv::primitives::types::BlockWitness { /* */ },
-    sbv::primitives::types::BlockWitness { /* */ },
-];
-let wit = ChunkWitness::new(
+let block_witnesses: Vec<BlockWitness> = /* exported block witnesses */;
+let version = Version::tsuki();
+let witness = ChunkWitness::new(
+    version.as_version_byte(),
     &block_witnesses,
-    template_wit.prev_msg_queue_hash,
-    template_wit.fork_name,
+    B256::ZERO,
+    version.fork,
+    None,
 );
-
-let task = UniversalProvingTask{
-    serialized_witness: vec![wit.rkyv_serialize(None)],
+let mut serialized_witness = Vec::new();
+PaddedChunkWitness::encode_to_writer(&witness, &mut serialized_witness)?;
+let task = UniversalProvingTask {
+    serialized_witness: vec![serialized_witness],
     aggregated_proofs: Vec::new(),
-    fork_name: "feynman".to_string(),
-    vk: vk.clone(),
-    identifier: Default::default(),
+    fork_name: witness.fork_name.clone(),
+    vk: prover.get_app_vk(),
+    identifier: String::new(),
 };
-
 ```
 
-
+Ordinary bincode inputs remain accepted by the updated guest. Existing integration
+and external worker producers still use bincode until explicitly migrated; they do
+not gain padding/alignment automatically. Older guest executables cannot decode the
+new envelope. See [the padded input guide](docs/padded-witness-input.md) for format,
+validation, reproduction, and rollout requirements.

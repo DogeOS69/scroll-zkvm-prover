@@ -19,6 +19,20 @@ use types_base::{
 /// `compression_infos` can be `None` in host mode.
 /// But in guest mode, it must be provided.
 pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
+    execute_inner(witness, None)
+}
+
+pub(super) fn execute_with_padded_codes(
+    witness: ChunkWitness,
+    codes: &[sbv_trie::PaddedCode],
+) -> Result<ChunkInfo, String> {
+    execute_inner(witness, Some(codes))
+}
+
+fn execute_inner(
+    witness: ChunkWitness,
+    padded_codes: Option<&[sbv_trie::PaddedCode]>,
+) -> Result<ChunkInfo, String> {
     let chain = Chain::from_id(witness.blocks[0].chain_id);
     let prev_blockhash = witness.blocks[0].header.parent_hash();
     let post_blockhash = witness
@@ -48,8 +62,16 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         withdraw_root,
         next_message_index,
         ..
-    } = verifier::run(&witness.blocks, chain_spec, witness.compression_infos)
-        .map_err(|e| format!("verify error: {e}"))?;
+    } = match padded_codes {
+        Some(codes) => verifier::run_with_padded_codes(
+            &witness.blocks,
+            chain_spec,
+            witness.compression_infos,
+            codes,
+        ),
+        None => verifier::run(&witness.blocks, chain_spec, witness.compression_infos),
+    }
+    .map_err(|e| format!("verify error: {e}"))?;
 
     let blocks = manually_drop_on_zkvm!(blocks);
     let mut rlp_buffer = manually_drop_on_zkvm!(Vec::with_capacity(2048));
