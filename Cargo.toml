@@ -68,11 +68,11 @@ openvm-transpiler = { git = "https://github.com/openvm-org/openvm.git", tag = "v
 # more openvm related libs
 openvm-stark-sdk = { git = "https://github.com/openvm-org/stark-backend.git", tag = "v1.4.0", default-features = false }
 
-sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "52313576348f1c9c36d749614e1caaf3523d1b19" }
-sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "52313576348f1c9c36d749614e1caaf3523d1b19", features = ["dev"] }
-sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "52313576348f1c9c36d749614e1caaf3523d1b19" }
-sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "52313576348f1c9c36d749614e1caaf3523d1b19" }
-sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "52313576348f1c9c36d749614e1caaf3523d1b19" }
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "084429371a781e5a5852dd641225c1a9747db3b2" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "084429371a781e5a5852dd641225c1a9747db3b2", features = ["dev"] }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "084429371a781e5a5852dd641225c1a9747db3b2" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "084429371a781e5a5852dd641225c1a9747db3b2" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "084429371a781e5a5852dd641225c1a9747db3b2" }
 
 alloy-consensus = "=1.8.2"
 alloy-provider = "=1.8.2"
@@ -140,13 +140,6 @@ scroll-zkvm-types-bundle = { path = "crates/types/bundle" }
 scroll-zkvm-integration = { path = "crates/integration" }
 scroll-zkvm-prover = { path = "crates/prover" }
 scroll-zkvm-verifier = { path = "crates/verifier" }
-
-#[patch."https://github.com/DogeOS69/stateless-block-verifier"]
-#sbv-core = { path = "../stateless-block-verifier/crates/core" }
-#sbv-helpers = { path = "../stateless-block-verifier/crates/helpers" }
-#sbv-primitives = { path = "../stateless-block-verifier/crates/primitives" }
-#sbv-trie = { path = "../stateless-block-verifier/crates/trie" }
-#sbv-utils = { path = "../stateless-block-verifier/crates/utils" }
 
 [profile.maxperf]
 inherits = "release"

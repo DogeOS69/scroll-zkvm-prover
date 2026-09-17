@@ -8,6 +8,7 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
+bincode.workspace = true
 alloy-primitives = { workspace = true, features = ["native-keccak"] }
 alloy-consensus = { workspace = true, features = ["crypto-backend"] }
 alloy-sol-types.workspace = true
@@ -33,6 +34,7 @@ openvm-pairing = { workspace = true, features = ["bn254"] }
 types-base = { path = "../base", package = "scroll-zkvm-types-base" }
 
 [dev-dependencies]
+serde_json.workspace = true
 ark-bn254 = "0.5.0"
 ark-ff = "0.5.0"
 ark-serialize = "0.5.0"
