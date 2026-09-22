@@ -20,7 +20,7 @@ use scroll_zkvm_types::{
     types_agg::ProgramCommitment,
     utils::serialize_vk,
 };
-use scroll_zkvm_verifier::verifier::{AGG_STARK_PROVING_KEY, UniversalVerifier};
+use scroll_zkvm_verifier::verifier::UniversalVerifier;
 use std::collections::HashMap;
 use std::{
     io::Cursor,
@@ -330,10 +330,7 @@ impl TaskProver for Prover {
 
 /// Testdata fixture directory for a fork.
 pub fn effective_testdata_fork_directory(fork: ForkName) -> &'static str {
-    match fork {
-        ForkName::Tsuki => "dogeos/next-message-index",
-        fork => fork.as_str(),
-    }
+    fork.as_str()
 }
 
 /// Enviroment settings for test: fork dir
@@ -411,10 +408,18 @@ pub fn tester_execute<T: ProverTester>(
             .map(|p| p.as_stark_proof().expect("must be stark proof")),
     )?;
 
-    let _app_vm_config = app_config.app_vm_config.clone();
+    use openvm_sdk::config::AggregationSystemParams;
+    use openvm_stark_sdk::config::{
+        internal_params_with_100_bits_security, leaf_params_with_100_bits_security,
+    };
+    // Execution does not need aggregation keys. Keep key generation lazy and
+    // avoid seeding OpenVM 2 with a key for a different app configuration.
     let sdk = Sdk::builder()
         .app_config(app_config)
-        .agg_pk(AGG_STARK_PROVING_KEY.clone())
+        .agg_params(AggregationSystemParams {
+            leaf: leaf_params_with_100_bits_security(),
+            internal: internal_params_with_100_bits_security(),
+        })
         .build()
         .map_err(|e| eyre::eyre!("sdk build failed: {e}"))?;
     let ret = scroll_zkvm_prover::utils::vm::execute_guest(&sdk, app_exe, &stdin)?;
