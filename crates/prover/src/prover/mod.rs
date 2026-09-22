@@ -9,10 +9,12 @@ use openvm_recursion_circuit::batch_constraint::commit_child_vk;
 use openvm_sdk::config::{
     AggregationConfig, AggregationSystemParams, AggregationTreeConfig, AppConfig,
 };
+use openvm_sdk::keygen::{AggProvingKey, AppProvingKey};
 use openvm_sdk::prover::{DeferralAggProver, MultiDeferralCircuitProver};
 use openvm_sdk::{F, SC, Sdk, StdIn};
 use openvm_sdk_config::{SdkVmConfig, deferral::SupportedDeferral};
 use openvm_stark_backend::StarkEngine;
+use openvm_stark_backend::keygen::types::MultiStarkVerifyingKey;
 use openvm_stark_sdk::{
     config::{
         hook_params_with_100_bits_security, internal_params_with_100_bits_security,
@@ -76,6 +78,8 @@ pub struct Prover {
     app_config: SdkAppConfig,
     /// Lazily initialized SDK
     sdk: OnceLock<Sdk>,
+    /// Optional caller-owned aggregation key, retained across SDK resets.
+    external_agg_pk: Option<AggProvingKey>,
 }
 
 /// Configure the [`Prover`].
@@ -91,6 +95,31 @@ impl Prover {
     /// Setup the [`Prover`] given paths to the application's exe and proving key.
     #[instrument("Prover::setup")]
     pub fn setup(config: ProverConfig, name: Option<&str>) -> Result<Self, Error> {
+        Self::setup_inner(config, name, None)
+    }
+
+    /// Set up with a caller-owned OpenVM 2 aggregation key.
+    ///
+    /// Validate its recursive verifying key before loading assets or initializing
+    /// the SDK. The SDK uses this key for proving and post-prove verification,
+    /// including when deferral is enabled. The key must have been generated for
+    /// the same app configuration and deferral hook as this prover.
+    #[instrument("Prover::setup_with_agg_pk", skip_all)]
+    pub fn setup_with_agg_pk(
+        config: ProverConfig,
+        name: Option<&str>,
+        agg_pk: AggProvingKey,
+        expected_agg_vk: &MultiStarkVerifyingKey<SC>,
+    ) -> Result<Self, Error> {
+        validate_external_agg_pk(&agg_pk, expected_agg_vk)?;
+        Self::setup_inner(config, name, Some(agg_pk))
+    }
+
+    fn setup_inner(
+        config: ProverConfig,
+        name: Option<&str>,
+        external_agg_pk: Option<AggProvingKey>,
+    ) -> Result<Self, Error> {
         let app_config = read_app_config(&config.path_app_config)?;
         let app_exe = read_app_exe(&config.path_app_exe)?;
         Ok(Self {
@@ -99,6 +128,7 @@ impl Prover {
             prover_name: name.unwrap_or("universal").to_string(),
             app_config,
             sdk: OnceLock::new(),
+            external_agg_pk,
         })
     }
 
@@ -115,14 +145,29 @@ impl Prover {
     fn get_sdk(&self) -> Result<&Sdk, Error> {
         self.sdk.get_or_try_init(|| {
             tracing::info!("Lazy initializing SDK...");
-            let sdk = Sdk::builder()
-                .app_config(self.app_config.clone())
-                .agg_params(default_agg_params())
-                .agg_tree_config(DEFAULT_AGG_TREE_CONFIG)
-                .build()
-                .map_err(|e| Error::GenProof(e.to_string()))?;
+            let sdk = self.build_sdk(None)?;
             Ok(sdk)
         })
+    }
+
+    fn build_sdk(&self, deferral: Option<DeferralAggProver>) -> Result<Sdk, Error> {
+        let builder = Sdk::builder().agg_tree_config(DEFAULT_AGG_TREE_CONFIG);
+        let builder = if let Some(agg_pk) = &self.external_agg_pk {
+            // OpenVM 2 requires an app proving key when seeding aggregation keys.
+            let app_pk = AppProvingKey::keygen(self.app_config.clone())
+                .map_err(|e| Error::Keygen(e.to_string()))?;
+            builder.app_pk(app_pk).agg_pk(agg_pk.clone())
+        } else {
+            builder
+                .app_config(self.app_config.clone())
+                .agg_params(default_agg_params())
+        };
+        let builder = if let Some(deferral) = deferral {
+            builder.deferral_agg_prover(deferral)
+        } else {
+            builder
+        };
+        builder.build().map_err(|e| Error::GenProof(e.to_string()))
     }
 
     /// Pick up loaded app commit, to distinguish from which circuit the proof comes
@@ -239,13 +284,7 @@ impl Prover {
 
         // Pre-build SDK with deferral enabled so get_sdk() returns it directly.
         self.reset();
-        let sdk = Sdk::builder()
-            .app_config(self.app_config.clone())
-            .agg_params(default_agg_params())
-            .agg_tree_config(DEFAULT_AGG_TREE_CONFIG)
-            .deferral_agg_prover(deferral_agg_prover)
-            .build()
-            .map_err(|e| Error::GenProof(e.to_string()))?;
+        let sdk = self.build_sdk(Some(deferral_agg_prover))?;
         self.sdk
             .set(sdk)
             .map_err(|_| Error::GenProof("sdk already set".to_string()))?;
@@ -401,5 +440,73 @@ impl Prover {
             .map_err(|e| Error::GenProof(format!("{}", e)))?;
 
         Ok(evm_proof)
+    }
+}
+
+fn validate_external_agg_pk(
+    agg_pk: &AggProvingKey,
+    expected_agg_vk: &MultiStarkVerifyingKey<SC>,
+) -> Result<(), Error> {
+    let actual = bincode_v1::serialize(&agg_pk.internal_recursive.get_vk())
+        .map_err(|e| Error::Keygen(format!("serialize supplied aggregation verifying key: {e}")))?;
+    let expected = bincode_v1::serialize(expected_agg_vk)
+        .map_err(|e| Error::Keygen(format!("serialize expected aggregation verifying key: {e}")))?;
+    if actual != expected {
+        return Err(Error::Keygen(
+            "externally supplied aggregation proving key does not match expected verifying key"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use openvm_sdk::keygen::AggPrefixProvingKey;
+    use openvm_stark_backend::keygen::types::MultiStarkProvingKey;
+    use openvm_stark_backend::p3_field::PrimeCharacteristicRing;
+
+    // Minimal key material suffices to test identity checks without expensive
+    // circuit key generation. These keys are never used to produce proofs.
+    fn identity_test_key() -> AggProvingKey {
+        let pk = Arc::new(MultiStarkProvingKey {
+            per_air: vec![],
+            trace_height_constraints: vec![],
+            max_constraint_degree: 1,
+            params: internal_params_with_100_bits_security(),
+            vk_pre_hash: [F::ZERO; 8],
+        });
+        AggProvingKey {
+            prefix: AggPrefixProvingKey {
+                leaf: pk.clone(),
+                internal_for_leaf: pk.clone(),
+            },
+            internal_recursive: pk,
+        }
+    }
+
+    #[test]
+    fn external_agg_key_accepts_matching_vk() {
+        let pk = identity_test_key();
+        let vk = pk.internal_recursive.get_vk();
+        validate_external_agg_pk(&pk, &vk).unwrap();
+    }
+
+    #[test]
+    fn external_agg_key_rejects_mismatch_before_loading_assets() {
+        let pk = identity_test_key();
+        let mut vk = pk.internal_recursive.get_vk();
+        // Keep pre_hash unchanged: compare the entire key, not just its digest.
+        vk.inner.trace_height_constraints.push(
+            openvm_stark_backend::keygen::types::LinearConstraint {
+                coefficients: vec![],
+                threshold: 1,
+            },
+        );
+        let result = Prover::setup_with_agg_pk(ProverConfig::default(), None, pk, &vk);
+        assert!(
+            matches!(result, Err(Error::Keygen(message)) if message.contains("does not match"))
+        );
     }
 }
