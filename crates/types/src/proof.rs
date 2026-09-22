@@ -1,16 +1,15 @@
 use crate::utils::{as_base64, vec_as_base64};
-use openvm_native_recursion::halo2::RawEvmProof;
 use openvm_sdk::SC;
-use openvm_sdk::codec::Decode;
 use openvm_stark_sdk::{
     openvm_stark_backend::{p3_field::PrimeField32, proof::Proof},
     p3_baby_bear::BabyBear,
 };
+use openvm_static_verifier::keygen::RawEvmProof;
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::Cursor;
 
-/// Helper type for convenience that implements [`From`] and [`Into`] traits between
+/// Helper type for convenience that implements fallible [`TryFrom`] conversions between
 /// [`OpenVmEvmProof`]. The difference is that the instances in [`EvmProof`] are the byte-encoding
 /// of the flattened [`Fr`] elements.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
@@ -51,15 +50,18 @@ pub struct StarkProofStat {
 /// Helper to modify serde implementations on the remote [`RootProof`] type.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarkProof {
-    /// The proofs. The length is always 1
-    /// Vec is used for old data compatibility.
+    /// The encoded proof (single proof, Vec for old data compatibility).
     #[serde(with = "as_base64")]
-    pub proofs: Vec<Proof<SC>>,
-    /// The public values for the proof.
+    pub proof: Vec<u8>,
+    /// The encoded user public values proof.
     #[serde(with = "as_base64")]
-    pub public_values: Vec<BabyBear>,
-    //pub exe_commitment: [u32; 8],
-    //pub vm_commitment: [u32; 8],
+    pub user_pvs_proof: Vec<u8>,
+    /// Verification baseline for the proof (v2+).
+    #[serde(with = "as_base64", default)]
+    pub baseline: Vec<u8>,
+    /// Deferral Merkle proofs for deferred STARK verification (v2+).
+    #[serde(with = "as_base64", default)]
+    pub deferral_merkle_proofs: Vec<u8>,
     #[serde(default)]
     pub stat: StarkProofStat,
 }
@@ -77,19 +79,11 @@ impl TryFrom<OpenVmVersionedVmStarkProof> for StarkProof {
     type Error = io::Error;
 
     fn try_from(proof: OpenVmVersionedVmStarkProof) -> io::Result<Self> {
-        let inner_proof = Proof::<SC>::decode_from_bytes(&proof.proof)?;
-        let mut pv_reader = Cursor::new(proof.user_public_values);
-        // decode_vec is not pub so we have to use the detail inside it ...
-        let len = usize::decode(&mut pv_reader)?;
-        let mut public_values = Vec::with_capacity(len);
-
-        for _ in 0..len {
-            public_values.push(BabyBear::decode(&mut pv_reader)?);
-        }
-
         Ok(Self {
-            proofs: vec![inner_proof],
-            public_values,
+            proof: proof.proof,
+            user_pvs_proof: proof.user_pvs_proof,
+            baseline: Vec::new(),
+            deferral_merkle_proofs: Vec::new(),
             stat: Default::default(),
         })
     }
@@ -100,52 +94,56 @@ use snark_verifier_sdk::snark_verifier::{
     halo2_base::halo2_proofs::halo2curves::bn256::Fr, util::arithmetic::PrimeField,
 };
 
-impl From<OpenVmEvmProof> for EvmProof {
-    fn from(value: OpenVmEvmProof) -> Self {
-        let raw_proof: RawEvmProof = value.try_into().expect("fail to convert");
+impl TryFrom<OpenVmEvmProof> for EvmProof {
+    type Error = io::Error;
+
+    fn try_from(value: OpenVmEvmProof) -> io::Result<Self> {
+        let raw_proof: RawEvmProof = value
+            .try_into()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let instances = raw_proof
             .instances
             .iter()
-            .flat_map(|fr| {
+            .flat_map(|fr: &Fr| {
                 let mut be_bytes = fr.to_bytes();
                 be_bytes.reverse();
                 be_bytes
             })
             .collect::<Vec<u8>>();
-        Self {
+        Ok(Self {
             proof: raw_proof.proof,
             instances,
-        }
+        })
     }
 }
 
-impl From<EvmProof> for OpenVmEvmProof {
-    fn from(value: EvmProof) -> Self {
-        assert_eq!(
-            value.instances.len() % 32,
-            0,
-            "expect len(instances) % 32 == 0"
-        );
+impl TryFrom<EvmProof> for OpenVmEvmProof {
+    type Error = io::Error;
 
+    fn try_from(value: EvmProof) -> io::Result<Self> {
+        if !value.instances.len().is_multiple_of(32) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "EVM proof instances length must be a multiple of 32",
+            ));
+        }
         let instances = value
             .instances
             .chunks_exact(32)
             .map(|be_bytes| {
-                Fr::from_repr({
-                    let mut le_bytes: [u8; 32] = be_bytes
-                        .try_into()
-                        .expect("instances.len() % 32 == 0 has already been asserted");
-                    le_bytes.reverse();
-                    le_bytes
+                let mut le_bytes: [u8; 32] = be_bytes.try_into().expect("full scalar chunk");
+                le_bytes.reverse();
+                Option::<Fr>::from(Fr::from_repr(le_bytes)).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "non-canonical EVM proof scalar")
                 })
-                .expect("Fr::from_repr failed")
             })
-            .collect::<Vec<Fr>>();
-        let raw_proof = RawEvmProof {
+            .collect::<io::Result<Vec<Fr>>>()?;
+        RawEvmProof {
             instances,
             proof: value.proof,
-        };
-        raw_proof.try_into().expect("fail to convert")
+        }
+        .try_into()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 }
 
@@ -209,11 +207,21 @@ impl ProofEnum {
     /// Derive public inputs from the proof.
     pub fn public_values(&self) -> Vec<u32> {
         match self {
-            Self::Stark(stark_proof) => stark_proof
-                .public_values
-                .iter()
-                .map(|x| x.as_canonical_u32())
-                .collect::<Vec<u32>>(),
+            Self::Stark(stark_proof) => {
+                // Decode user_pvs_proof to extract public values
+                use openvm_circuit::system::memory::merkle::public_values::UserPublicValuesProof;
+                use openvm_stark_sdk::config::baby_bear_poseidon2::{DIGEST_SIZE, F};
+                let proof: UserPublicValuesProof<DIGEST_SIZE, F> =
+                    UserPublicValuesProof::decode::<SC, _>(&mut Cursor::new(
+                        &stark_proof.user_pvs_proof,
+                    ))
+                    .expect("decode user_pvs_proof failed");
+                proof
+                    .public_values
+                    .iter()
+                    .map(|x: &F| x.as_canonical_u32())
+                    .collect::<Vec<u32>>()
+            }
             Self::Evm(evm_proof) => {
                 // The first 12 scalars are accumulators.
                 // The next 2 scalars are digests.
@@ -234,5 +242,48 @@ impl ProofEnum {
                     .collect::<Vec<u32>>()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod evm_conversion_tests {
+    use super::*;
+
+    fn encoded_proof() -> EvmProof {
+        let mut instances = vec![0; 46 * 32];
+        instances[14 * 32 + 31] = 42;
+        EvmProof {
+            proof: vec![1, 2, 3],
+            instances,
+        }
+    }
+
+    #[test]
+    fn evm_proof_roundtrip_preserves_encoding() {
+        let proof = encoded_proof();
+        let openvm = OpenVmEvmProof::try_from(proof.clone()).unwrap();
+        assert_eq!(openvm.user_public_values[0], 42);
+        assert_eq!(EvmProof::try_from(openvm).unwrap(), proof);
+    }
+
+    #[test]
+    fn malformed_instances_return_errors() {
+        for instances in [vec![], vec![0; 31], vec![0; 14 * 32], vec![255; 46 * 32]] {
+            let result = OpenVmEvmProof::try_from(EvmProof {
+                proof: vec![],
+                instances,
+            });
+            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
+        }
+    }
+
+    #[test]
+    fn malformed_accumulator_returns_error() {
+        let mut proof = OpenVmEvmProof::try_from(encoded_proof()).unwrap();
+        proof.proof_data.accumulator.pop();
+        assert_eq!(
+            EvmProof::try_from(proof).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
     }
 }

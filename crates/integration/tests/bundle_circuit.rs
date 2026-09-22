@@ -1,6 +1,6 @@
 use sbv_primitives::B256;
 use scroll_zkvm_integration::{
-    ProverTester, TaskProver,
+    ASSET_BASE_DIR, ProverTester,
     testers::{
         batch::{BatchProverTester, preset_batch_multiple, preset_batch_validium},
         bundle::{BundleProverTester, BundleTaskGenerator},
@@ -52,7 +52,6 @@ fn print_vks() -> eyre::Result<()> {
         let config = ProverConfig {
             path_app_exe,
             path_app_config,
-            ..Default::default()
         };
 
         let app_vk = hex::encode(Prover::setup(config, None).unwrap().get_app_vk());
@@ -134,9 +133,9 @@ fn e2e() -> eyre::Result<()> {
 }
 
 fn e2e_inner(
-    chunk_prover: &mut impl TaskProver,
-    batch_prover: &mut impl TaskProver,
-    bundle_prover: &mut impl TaskProver,
+    chunk_prover: &mut Prover,
+    batch_prover: &mut Prover,
+    bundle_prover: &mut Prover,
 ) -> eyre::Result<()> {
     let mut task = preset_bundle();
     let wit = task.get_or_build_witness()?;
@@ -160,9 +159,8 @@ fn e2e_inner(
         ForkName::GalileoV2 => {
             Some("7ff4ebd1e74adf0f7740df04d9ba7a334beb37faffa126dda00c6b2ade8f90d4")
         }
-        // Tsuki bundle e2e fixtures and a golden bundle PI hash are out of scope until
-        // testdata/tsuki is checked in. The proof-vs-metadata PI check below still runs if
-        // the fixtures are available.
+        // A pinned Tsuki bundle PI hash remains follow-up scope. The proof-vs-metadata PI
+        // check below still covers the checked-in Tsuki fixture corpus.
         ForkName::Tsuki => None,
     };
     let expected_pi_hash = metadata.pi_hash_by_version(version);
@@ -177,7 +175,46 @@ fn e2e_inner(
 
     let proof = task.get_or_build_proof(bundle_prover, batch_prover, chunk_prover)?;
 
-    let evm_proof: OpenVmEvmProof = proof.into_evm_proof().unwrap().into();
+    let inner_evm_proof = proof.into_evm_proof().unwrap();
+
+    // Verify that the canonical digest files published alongside the release match the
+    // digests embedded in the proof instances. This catches the common mistake of
+    // deploying an EVM verifier with Montgomery-form digests while the proof uses
+    // canonical-form digests.
+    let instances = &inner_evm_proof.instances;
+    assert!(
+        instances.len() >= 14 * 32,
+        "evm proof instances too short: {}",
+        instances.len()
+    );
+    let digest1_from_proof = &instances[12 * 32..13 * 32];
+    let digest2_from_proof = &instances[13 * 32..14 * 32];
+
+    let digest1_path = ASSET_BASE_DIR.join("bundle").join("digest_1.hex");
+    let digest2_path = ASSET_BASE_DIR.join("bundle").join("digest_2.hex");
+
+    let digest1_hex = std::fs::read_to_string(&digest1_path)?
+        .trim()
+        .trim_start_matches("0x")
+        .to_lowercase();
+    let digest2_hex = std::fs::read_to_string(&digest2_path)?
+        .trim()
+        .trim_start_matches("0x")
+        .to_lowercase();
+
+    let digest1_from_file = hex::decode(&digest1_hex)?;
+    let digest2_from_file = hex::decode(&digest2_hex)?;
+
+    assert_eq!(
+        digest1_from_proof, digest1_from_file,
+        "digest_1.hex does not match the digest in the proof instances; expected canonical form"
+    );
+    assert_eq!(
+        digest2_from_proof, digest2_from_file,
+        "digest_2.hex does not match the digest in the proof instances; expected canonical form"
+    );
+
+    let evm_proof: OpenVmEvmProof = inner_evm_proof.try_into()?;
 
     let observed_instances = &evm_proof.user_public_values;
 
@@ -212,7 +249,7 @@ fn test_execute_validium() -> eyre::Result<()> {
 
     let proof =
         task.get_or_build_proof(&mut bundle_prover, &mut batch_prover, &mut chunk_prover)?;
-    let evm_proof: OpenVmEvmProof = proof.into_evm_proof().unwrap().into();
+    let evm_proof: OpenVmEvmProof = proof.into_evm_proof().unwrap().try_into()?;
     let observed_instances = &evm_proof.user_public_values;
     for (i, (&expected, &observed)) in expected_pi_hash
         .iter()
