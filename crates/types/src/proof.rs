@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::Cursor;
 
-/// Helper type for convenience that implements [`From`] and [`Into`] traits between
+/// Helper type for convenience that implements fallible [`TryFrom`] conversions between
 /// [`OpenVmEvmProof`]. The difference is that the instances in [`EvmProof`] are the byte-encoding
 /// of the flattened [`Fr`] elements.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
@@ -94,9 +94,13 @@ use snark_verifier_sdk::snark_verifier::{
     halo2_base::halo2_proofs::halo2curves::bn256::Fr, util::arithmetic::PrimeField,
 };
 
-impl From<OpenVmEvmProof> for EvmProof {
-    fn from(value: OpenVmEvmProof) -> Self {
-        let raw_proof: RawEvmProof = value.into();
+impl TryFrom<OpenVmEvmProof> for EvmProof {
+    type Error = io::Error;
+
+    fn try_from(value: OpenVmEvmProof) -> io::Result<Self> {
+        let raw_proof: RawEvmProof = value
+            .try_into()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let instances = raw_proof
             .instances
             .iter()
@@ -106,40 +110,40 @@ impl From<OpenVmEvmProof> for EvmProof {
                 be_bytes
             })
             .collect::<Vec<u8>>();
-        Self {
+        Ok(Self {
             proof: raw_proof.proof,
             instances,
-        }
+        })
     }
 }
 
-impl From<EvmProof> for OpenVmEvmProof {
-    fn from(value: EvmProof) -> Self {
-        assert_eq!(
-            value.instances.len() % 32,
-            0,
-            "expect len(instances) % 32 == 0"
-        );
+impl TryFrom<EvmProof> for OpenVmEvmProof {
+    type Error = io::Error;
 
+    fn try_from(value: EvmProof) -> io::Result<Self> {
+        if !value.instances.len().is_multiple_of(32) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "EVM proof instances length must be a multiple of 32",
+            ));
+        }
         let instances = value
             .instances
             .chunks_exact(32)
             .map(|be_bytes| {
-                Fr::from_repr({
-                    let mut le_bytes: [u8; 32] = be_bytes
-                        .try_into()
-                        .expect("instances.len() % 32 == 0 has already been asserted");
-                    le_bytes.reverse();
-                    le_bytes
+                let mut le_bytes: [u8; 32] = be_bytes.try_into().expect("full scalar chunk");
+                le_bytes.reverse();
+                Option::<Fr>::from(Fr::from_repr(le_bytes)).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "non-canonical EVM proof scalar")
                 })
-                .expect("Fr::from_repr failed")
             })
-            .collect::<Vec<Fr>>();
-        let raw_proof = RawEvmProof {
+            .collect::<io::Result<Vec<Fr>>>()?;
+        RawEvmProof {
             instances,
             proof: value.proof,
-        };
-        raw_proof.into()
+        }
+        .try_into()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 }
 
@@ -238,5 +242,48 @@ impl ProofEnum {
                     .collect::<Vec<u32>>()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod evm_conversion_tests {
+    use super::*;
+
+    fn encoded_proof() -> EvmProof {
+        let mut instances = vec![0; 46 * 32];
+        instances[14 * 32 + 31] = 42;
+        EvmProof {
+            proof: vec![1, 2, 3],
+            instances,
+        }
+    }
+
+    #[test]
+    fn evm_proof_roundtrip_preserves_encoding() {
+        let proof = encoded_proof();
+        let openvm = OpenVmEvmProof::try_from(proof.clone()).unwrap();
+        assert_eq!(openvm.user_public_values[0], 42);
+        assert_eq!(EvmProof::try_from(openvm).unwrap(), proof);
+    }
+
+    #[test]
+    fn malformed_instances_return_errors() {
+        for instances in [vec![], vec![0; 31], vec![0; 14 * 32], vec![255; 46 * 32]] {
+            let result = OpenVmEvmProof::try_from(EvmProof {
+                proof: vec![],
+                instances,
+            });
+            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
+        }
+    }
+
+    #[test]
+    fn malformed_accumulator_returns_error() {
+        let mut proof = OpenVmEvmProof::try_from(encoded_proof()).unwrap();
+        proof.proof_data.accumulator.pop();
+        assert_eq!(
+            EvmProof::try_from(proof).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
     }
 }

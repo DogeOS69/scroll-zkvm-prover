@@ -119,8 +119,11 @@ fn test_verify_evm_proof() -> eyre::Result<()> {
 
     let evm_verifier: Vec<u8> = std::fs::read(Path::new(PATH_TESTDATA).join("verifier.bin"))?;
 
-    let gas_cost = verify_evm_proof(&evm_verifier, &evm_proof.into_evm_proof().unwrap().into())
-        .map_err(|e| eyre::eyre!("evm-proof verification failed: {e}"))?;
+    let gas_cost = verify_evm_proof(
+        &evm_verifier,
+        &evm_proof.into_evm_proof().unwrap().try_into()?,
+    )
+    .map_err(|e| eyre::eyre!("evm-proof verification failed: {e}"))?;
 
     println!("evm-verify gas cost = {gas_cost}");
 

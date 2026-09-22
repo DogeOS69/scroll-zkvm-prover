@@ -50,7 +50,7 @@ build-guest:
 	sh build-guest.sh
 
 build-guest-local:
-	cargo run --release -p scroll-zkvm-build-guest
+	cargo run --locked --release -p scroll-zkvm-build-guest -- --mode force
 
 clean-build-guest: clean-guest build-guest
 

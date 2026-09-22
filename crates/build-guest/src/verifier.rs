@@ -10,6 +10,7 @@ use eyre::Result;
 pub fn download_evm_verifier() -> Result<openvm_sdk::types::EvmHalo2Verifier> {
     // The `openvm-solidity-sdk` release tag to download from. This is NOT the
     // same as the `openvm` crate version; the SDK follows its own tagging.
+    // OpenVM 2.0.2 continues to use the Solidity SDK v2.0 verifier ABI.
     let solidity_sdk_tag = "v2.0";
     // We generate/download the bundle (deferral-enabled) verifier. The plain
     // `v2.0-base` verifier is used for leaf circuits that do not defer proof
