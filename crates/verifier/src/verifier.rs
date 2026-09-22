@@ -155,7 +155,7 @@ mod tests {
         pub fn verify_wrapped_proof(&self, proof: &WrappedProof) -> eyre::Result<()> {
             match &proof.proof {
                 ProofEnum::Evm(p) => {
-                    let _gas = self.verify_evm_proof(&p.clone().into(), &proof.vk)?;
+                    let _gas = self.verify_evm_proof(&p.clone().try_into()?, &proof.vk)?;
                     Ok(())
                 }
                 ProofEnum::Stark(p) => self.verify_stark_proof(p, &proof.vk),
@@ -207,7 +207,7 @@ mod tests {
         let verifier = UniversalVerifier::setup(Path::new(PATH_TESTDATA))?;
 
         verifier.verify_evm_proof(
-            &evm_proof.proof.into_evm_proof().unwrap().into(),
+            &evm_proof.proof.into_evm_proof().unwrap().try_into()?,
             &evm_proof.vk,
         )?;
 

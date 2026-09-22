@@ -13,7 +13,7 @@ Critical context for AI agents working on this repo. Read this before making cha
 
 ## OpenVM Version Sensitivity
 
-This project uses **OpenVM v2.0.0** as its ZKVM. Guest executables (`.vmexe`) and host code **must be built from the exact same OpenVM version**. Even a minor version bump can change:
+This project uses **OpenVM v2.0.2** as its ZKVM. Guest executables (`.vmexe`) and host code **must be built from the exact same OpenVM version**. Even a minor version bump can change:
 
 - The guest/host data layout (hint streams, public inputs)
 - The Halo2 SRS degree requirement
@@ -23,15 +23,15 @@ This project uses **OpenVM v2.0.0** as its ZKVM. Guest executables (`.vmexe`) an
 
 ### How to update OpenVM dependencies correctly
 
-OpenVM is declared as a **git dependency** (`tag = "v2.0.0"`) in `Cargo.toml`, and the exact commit is also pinned in `Cargo.lock`. The `openvm-org/openvm.git` and `openvm-org/stark-backend.git` entries MUST stay on matching tags — `openvm`'s own `Cargo.toml` pins a specific `stark-backend` tag, and a mismatch produces duplicate-registry / type-mismatch errors. Because the tag is immutable, the declared ref and the locked commit should always agree. The real hazard is a bare `cargo update`: it will **not** change the OpenVM tag, but it will bump unrelated crates.io packages (e.g. `alloy`, `revm`) which often break compatibility with the `scroll-tech/reth` and `sbv` forks.
+OpenVM is declared as a **git dependency** (`tag = "v2.0.2"`) in `Cargo.toml`, and the exact commit is also pinned in `Cargo.lock`. The `openvm-org/openvm.git` and `openvm-org/stark-backend.git` entries MUST use compatible tags (currently OpenVM `v2.0.2` with stark-backend `v2.0.1`) — `openvm`'s own `Cargo.toml` pins a specific `stark-backend` tag, and a mismatch produces duplicate-registry / type-mismatch errors. Because the tag is immutable, the declared ref and the locked commit should always agree. The real hazard is a bare `cargo update`: it will **not** change the OpenVM tag, but it will bump unrelated crates.io packages (e.g. `alloy`, `revm`) which often break compatibility with the `scroll-tech/reth` and `sbv` forks.
 
 **Do NOT run a global `cargo update` unless you are prepared to upgrade the entire `alloy`/`revm`/`reth`/`sbv` dependency chain together.**
 
-To move to a newer OpenVM tag, retarget every `openvm-org/openvm.git` and `openvm-org/stark-backend.git` entry in `Cargo.toml` to the new tag, then refresh only those git sources — `cargo metadata` is enough — rather than a global `cargo update`. Verify with `git diff Cargo.lock` that no other package's version/source changed. Then rebuild guests and run tests as described below.
+To move to a newer OpenVM tag, retarget every `openvm-org/openvm.git` and `openvm-org/stark-backend.git` entry in `Cargo.toml` to its corresponding compatible tag, then refresh only those git sources — `cargo metadata` is enough — rather than a global `cargo update`. Align required SNARK dependencies with OpenVM (currently snark-verifier-sdk `v0.2.7` and halo2curves-axiom `0.7.3`). Use targeted `cargo update -p` only where the new dependency constraints require it, and verify `git diff Cargo.lock` contains no unrelated changes to the Alloy/REVM/Reth/SBV stack. Then rebuild guests and run tests as described below.
 
 ### After ANY OpenVM version upgrade, you MUST:
 
-1. **Update the hardcoded version string** in `crates/build-guest/src/verifier.rs`:
+1. **Verify the compatible Solidity SDK version** in `crates/build-guest/src/verifier.rs` (OpenVM v2.0.2 continues to use Solidity SDK v2.0):
    ```rust
    let solidity_sdk_tag = "v2.0"; // MUST match openvm-solidity-sdk tag
    let verifier_path = "v2.0-deferral"; // bundle/deferral verifier
@@ -58,7 +58,7 @@ To move to a newer OpenVM tag, retarget every `openvm-org/openvm.git` and `openv
    > (`batch` needs `chunk`, `bundle` needs `batch`). Always build in a single
    > `force` run so dependencies are generated in the correct order.
 
-3. **Verify commitments were updated** — check that `*_exe_commit.rs` and `*_vm_commit.rs` files changed, and that `openVmVk.json` timestamps are fresh.
+3. **Verify commitments were regenerated** — inspect `*_exe_commit.rs`, `*_vm_commit.rs`, and fresh `openVmVk.json` outputs. A patch upgrade may leave VM commitments unchanged; use generated values rather than requiring every file to differ.
 
 4. **Clear global OpenVM caches** in `~/.openvm/`:
    ```bash
@@ -67,7 +67,7 @@ To move to a newer OpenVM tag, retarget every `openvm-org/openvm.git` and `openv
    These are cached proving keys. They are **not** automatically invalidated on version bumps.
 
 5. **Check SRS params** in `~/.openvm/params/`:
-   - OpenVM v2.0.0 requires `kzg_bn254_24.srs` (2 GB)
+   - OpenVM v2.0.2 requires `kzg_bn254_24.srs` (2 GB)
    - If the file is empty/corrupted, replace it (check for `.1` or `.part` suffixes from interrupted downloads)
 
 6. **Clear test output cache** before re-running integration tests:

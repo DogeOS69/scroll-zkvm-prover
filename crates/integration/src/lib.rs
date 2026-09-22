@@ -277,7 +277,7 @@ impl TaskProver for Prover {
             // gen stark proof
             Ok(self.gen_proof_stark(stdin, &[])?.into())
         } else {
-            let proof: EvmProof = self.gen_proof_snark(stdin, &[])?.into();
+            let proof: EvmProof = self.gen_proof_snark(stdin, &[])?.try_into()?;
             Ok(proof.into())
         }
     }
@@ -295,7 +295,7 @@ impl TaskProver for Prover {
         if !gen_snark {
             Ok(self.gen_proof_stark(stdin, def_inputs)?.into())
         } else {
-            let proof: EvmProof = self.gen_proof_snark(stdin, def_inputs)?.into();
+            let proof: EvmProof = self.gen_proof_snark(stdin, def_inputs)?.try_into()?;
             Ok(proof.into())
         }
     }
@@ -669,7 +669,7 @@ where
             .clone()
             .into_evm_proof()
             .expect("must be evm proof")
-            .into(),
+            .try_into()?,
         &vk,
     )?;
     tracing::info!("evm verify gas cost = {gas}");

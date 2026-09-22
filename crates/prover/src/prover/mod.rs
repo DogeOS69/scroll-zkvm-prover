@@ -309,7 +309,7 @@ impl Prover {
         let proof = if !with_snark {
             self.gen_proof_stark(stdin, &[])?.into()
         } else {
-            EvmProof::from(self.gen_proof_snark(stdin, &[])?).into()
+            EvmProof::try_from(self.gen_proof_snark(stdin, &[])?)?.into()
         };
 
         tracing::info!(

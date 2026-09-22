@@ -214,7 +214,7 @@ fn e2e_inner(
         "digest_2.hex does not match the digest in the proof instances; expected canonical form"
     );
 
-    let evm_proof: OpenVmEvmProof = inner_evm_proof.into();
+    let evm_proof: OpenVmEvmProof = inner_evm_proof.try_into()?;
 
     let observed_instances = &evm_proof.user_public_values;
 
@@ -249,7 +249,7 @@ fn test_execute_validium() -> eyre::Result<()> {
 
     let proof =
         task.get_or_build_proof(&mut bundle_prover, &mut batch_prover, &mut chunk_prover)?;
-    let evm_proof: OpenVmEvmProof = proof.into_evm_proof().unwrap().into();
+    let evm_proof: OpenVmEvmProof = proof.into_evm_proof().unwrap().try_into()?;
     let observed_instances = &evm_proof.user_public_values;
     for (i, (&expected, &observed)) in expected_pi_hash
         .iter()
