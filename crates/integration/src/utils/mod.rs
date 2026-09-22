@@ -16,8 +16,7 @@ use scroll_zkvm_types::{
     types_agg::AggregationInput,
     utils::{keccak256, point_eval, serialize_vk},
 };
-use std::env;
-use vm_zstd::zstd_encode;
+use std::{env, io::Write};
 
 #[allow(dead_code)]
 fn final_l1_index(blk: &BlockWitness) -> u64 {
@@ -202,7 +201,12 @@ pub fn build_batch_witnesses(
     }
     payload.extend(chunk_tx_bytes);
     // compress ...
-    let compressed_payload = zstd_encode(&payload);
+    // Share the pinned encoder used by DogeOS Reth. Enabling vm-zstd's encoder
+    // feature pulls a second Git source with the same exported C symbols.
+    let mut encoder = encoder_standard::init_zstd_encoder(encoder_standard::N_BLOCK_SIZE_TARGET);
+    encoder.set_pledged_src_size(Some(payload.len() as u64))?;
+    encoder.write_all(&payload)?;
+    let compressed_payload = encoder.finish()?;
 
     // 5 bytes are utilised by version (1), compressed_len (3) and is_encoded (1).
     if compressed_payload.len() > N_BLOB_BYTES - 5 {

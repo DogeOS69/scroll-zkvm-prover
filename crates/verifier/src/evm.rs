@@ -3,7 +3,7 @@ use revm::{
     Context, ExecuteCommitEvm, MainBuilder, MainContext,
     context::{TxEnv, result::ExecutionResult},
     database::InMemoryDB,
-    primitives::TxKind,
+    primitives::{TxKind, eip7825::TX_GAS_LIMIT_CAP},
 };
 // Re-export from snark_verifier_sdk.
 pub use snark_verifier_sdk::{
@@ -53,7 +53,7 @@ fn deploy_and_call(deployment_code: Vec<u8>, calldata: Vec<u8>) -> Result<u64, S
 
     let result = evm
         .transact_commit(TxEnv {
-            gas_limit: u64::MAX,
+            gas_limit: TX_GAS_LIMIT_CAP,
             kind: TxKind::Create,
             data: deployment_code.into(),
             ..Default::default()
@@ -81,7 +81,7 @@ fn deploy_and_call(deployment_code: Vec<u8>, calldata: Vec<u8>) -> Result<u64, S
 
     let result = evm
         .transact_commit(TxEnv {
-            gas_limit: u64::MAX,
+            gas_limit: TX_GAS_LIMIT_CAP,
             kind: TxKind::Call(contract),
             data: calldata.into(),
             nonce: 1,
@@ -128,4 +128,32 @@ fn test_verify_evm_proof() -> eyre::Result<()> {
     println!("evm-verify gas cost = {gas_cost}");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod gas_limit_tests {
+    use super::deploy_and_call;
+
+    #[test]
+    fn deploy_and_call_respects_transaction_gas_cap() {
+        // Init code returns a one-byte STOP runtime.
+        let deployment = vec![
+            0x60, 0x01, 0x60, 0x0c, 0x60, 0x00, 0x39, 0x60, 0x01, 0x60, 0x00, 0xf3, 0x00,
+        ];
+        assert!(deploy_and_call(deployment, vec![]).unwrap() > 0);
+    }
+
+    #[test]
+    fn reverting_contract_is_rejected() {
+        // Init code returns PUSH0 PUSH0 REVERT as runtime.
+        let deployment = vec![
+            0x60, 0x03, 0x60, 0x0c, 0x60, 0x00, 0x39, 0x60, 0x03, 0x60, 0x00, 0xf3, 0x5f, 0x5f,
+            0xfd,
+        ];
+        assert!(
+            deploy_and_call(deployment, vec![])
+                .unwrap_err()
+                .contains("Contract call transaction reverts")
+        );
+    }
 }

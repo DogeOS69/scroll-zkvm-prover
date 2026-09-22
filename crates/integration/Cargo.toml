@@ -45,7 +45,7 @@ eyre.workspace = true
 rayon.workspace = true
 serde.workspace = true
 futures.workspace = true
-vm-zstd = { workspace = true, features = ["zstd"] }
+encoder-standard = { git = "https://github.com/scroll-tech/da-codec", rev = "54929786434f00efd00431517a332f1ec8ca58d4" }
 tokio = { workspace = true, features = ["full"] }
 
 hex.workspace = true

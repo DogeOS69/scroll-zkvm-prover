@@ -67,7 +67,7 @@ To move to a newer OpenVM tag, retarget every `openvm-org/openvm.git` and `openv
    These are cached proving keys. They are **not** automatically invalidated on version bumps.
 
 5. **Check SRS params** in `~/.openvm/params/`:
-   - OpenVM v2.0.2 requires `kzg_bn254_24.srs` (2 GB)
+   - The full bundle flow requires `kzg_bn254_23.srs` (1 GB) and `kzg_bn254_24.srs` (2 GB); the Makefile also prepares degree 22 parameters.
    - If the file is empty/corrupted, replace it (check for `.1` or `.part` suffixes from interrupted downloads)
 
 6. **Clear test output cache** before re-running integration tests:

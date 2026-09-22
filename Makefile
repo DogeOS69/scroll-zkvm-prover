@@ -19,7 +19,7 @@ endif
 
 SRS_PARAMS_DIR := $(HOME)/.openvm/params
 SRS_PARAMS_URL := https://circuit-release.s3.us-west-2.amazonaws.com/scroll-zkvm/params
-SRS_PARAMS := $(SRS_PARAMS_DIR)/kzg_bn254_22.srs $(SRS_PARAMS_DIR)/kzg_bn254_24.srs
+SRS_PARAMS := $(SRS_PARAMS_DIR)/kzg_bn254_22.srs $(SRS_PARAMS_DIR)/kzg_bn254_23.srs $(SRS_PARAMS_DIR)/kzg_bn254_24.srs
 
 # Download params if missing
 $(SRS_PARAMS_DIR)/%.srs:
@@ -113,5 +113,5 @@ test-bundle:
 test-bundle-local:
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test bundle_circuit setup_prove_verify_local_task -- --exact --nocapture
 
-test-e2e-bundle:
+test-e2e-bundle: $(SRS_PARAMS)
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test bundle_circuit e2e -- --exact --nocapture

@@ -2310,7 +2310,7 @@ dependencies = [
  "dogeos-hardforks",
  "dogeos-protocol-types",
  "dogeos-reth-primitives",
- "encoder-standard 0.1.0 (git+https://github.com/scroll-tech/da-codec?rev=54929786434f00efd00431517a332f1ec8ca58d4)",
+ "encoder-standard",
  "reth-chainspec",
  "reth-evm",
  "reth-execution-types",
@@ -2487,14 +2487,6 @@ checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 name = "encoder-standard"
 version = "0.1.0"
 source = "git+https://github.com/scroll-tech/da-codec?rev=54929786434f00efd00431517a332f1ec8ca58d4#54929786434f00efd00431517a332f1ec8ca58d4"
-dependencies = [
- "zstd",
-]
-
-[[package]]
-name = "encoder-standard"
-version = "0.1.0"
-source = "git+https://github.com/scroll-tech/da-codec.git#54929786434f00efd00431517a332f1ec8ca58d4"
 dependencies = [
  "zstd",
 ]
@@ -7723,6 +7715,7 @@ dependencies = [
  "clap",
  "csv",
  "dotenvy",
+ "encoder-standard",
  "eyre",
  "futures",
  "glob",
@@ -7756,7 +7749,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.20",
  "url",
- "vm-zstd",
 ]
 
 [[package]]
@@ -9188,7 +9180,6 @@ source = "git+https://github.com/scroll-tech/rust-zstd-decompressor.git?rev=b027
 dependencies = [
  "anyhow",
  "bitstream-io",
- "encoder-standard 0.1.0 (git+https://github.com/scroll-tech/da-codec.git)",
  "itertools 0.11.0",
  "serde",
  "strum 0.25.0",
