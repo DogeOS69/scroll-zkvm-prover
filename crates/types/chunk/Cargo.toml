@@ -41,6 +41,13 @@ openvm-pairing = { workspace = true, features = ["bn254", "halo2curves"] }
 openvm-pairing-guest = { workspace = true, features = ["bn254", "halo2curves"] }
 serde_json.workspace = true
 
+[[test]]
+name = "compression_infos"
+required-features = ["scroll", "host"]
+
+[[test]]
+name = "validium_inputs"
+required-features = ["scroll", "host"]
 
 [features]
 default = []

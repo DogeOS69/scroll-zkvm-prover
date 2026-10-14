@@ -5,8 +5,10 @@
 //! still commits to every transaction, so the post-state root would come from a prefix only.
 //! This test forges exactly that witness (last block truncated, header root set to the prefix
 //! root) on a real Tsuki chunk and checks that `execute` rejects it.
-#![cfg(all(feature = "scroll", feature = "host"))]
 
+mod common;
+
+use common::{TSUKI_VERSION_BYTE, tsuki_blocks};
 use sbv_core::{BlockWitness, error::StatelessValidationError, verifier};
 use sbv_primitives::{
     B256,
@@ -14,21 +16,7 @@ use sbv_primitives::{
     hardforks::Hardfork,
 };
 use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
-use std::path::Path;
 use types_base::fork_name::ForkName;
-
-const TSUKI_VERSION_BYTE: u8 = 11;
-
-fn tsuki_blocks() -> Vec<BlockWitness> {
-    let dir =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../integration/testdata/tsuki/witnesses");
-    (1..=8)
-        .map(|n| {
-            let json = std::fs::read(dir.join(format!("{n}.json"))).unwrap();
-            serde_json::from_slice(&json).unwrap()
-        })
-        .collect()
-}
 
 /// The state root reached by executing the chunk without the last block's final transaction.
 fn prefix_state_root(blocks: &[BlockWitness]) -> B256 {
@@ -67,13 +55,16 @@ fn truncated_compression_infos_with_matching_header_root_are_rejected() {
 
     let mut witness =
         ChunkWitness::new_scroll(TSUKI_VERSION_BYTE, &blocks, B256::ZERO, ForkName::Tsuki);
+    // The count check fires before execution, so the forged root does not change the outcome
+    // here. It makes the witness otherwise consistent, so that without the check it executes.
     witness.blocks.last_mut().unwrap().header.state_root = prefix_root;
     witness.compression_infos.last_mut().unwrap().pop().unwrap();
 
     let err = execute(witness).expect_err("a chunk that skips a transaction must not execute");
     assert!(
         err.contains(&format!(
-            "compression infos count {} != tx count {last_txs}",
+            "block {}: compression infos count {} != tx count {last_txs}",
+            blocks.last().unwrap().header.number,
             last_txs - 1
         )),
         "unexpected error: {err}"
