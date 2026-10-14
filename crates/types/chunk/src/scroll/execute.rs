@@ -14,11 +14,16 @@ use sbv_primitives::{
 use types_base::{
     fork_name::ForkName,
     public_inputs::scroll::chunk::{BlockContextV2, ChunkInfo},
+    version::Version,
 };
 
-/// `compression_infos` can be `None` in host mode.
-/// But in guest mode, it must be provided.
+/// Executes the chunk and derives its public inputs.
+///
+/// `compression_infos` and `validium` are untrusted prover data: their shapes are checked against
+/// the blocks and the version before anything is executed or hashed.
 pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
+    check_validium_inputs(&witness)?;
+
     let chain = Chain::from_id(witness.blocks[0].chain_id);
     let prev_blockhash = witness.blocks[0].header.parent_hash();
     let post_blockhash = witness
@@ -93,6 +98,28 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
     println!("chunk_info = {}", chunk_info);
 
     Ok(chunk_info)
+}
+
+/// Validium inputs must be present exactly when the version's domain is validium, with one list
+/// of validium transactions per block. Otherwise the rolling message queue hash would cover a
+/// different set of L1 messages from the one that was executed.
+fn check_validium_inputs(witness: &ChunkWitness) -> Result<(), String> {
+    let version = Version::from(witness.version);
+    match &witness.validium {
+        Some(_) if !version.is_validium() => Err(format!(
+            "validium inputs supplied for a {:?} domain chunk",
+            version.domain
+        )),
+        None if version.is_validium() => {
+            Err("validium inputs missing for a validium domain chunk".to_string())
+        }
+        Some(validium) if validium.validium_txs.len() != witness.blocks.len() => Err(format!(
+            "validium transaction lists count {} != block count {}",
+            validium.validium_txs.len(),
+            witness.blocks.len()
+        )),
+        _ => Ok(()),
+    }
 }
 
 fn block_to_context(block: &RecoveredBlock<Block>) -> BlockContextV2 {

@@ -1,0 +1,50 @@
+name: Chunk Witness Checks
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/chunk-witness-checks.yml
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - Makefile
+      - crates/types/**/*
+      - crates/integration/testdata/tsuki/**/*
+  push:
+    branches:
+      - master
+      - dogeos/main
+      - release/*
+    paths:
+      - .github/workflows/chunk-witness-checks.yml
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - Makefile
+      - crates/types/**/*
+      - crates/integration/testdata/tsuki/**/*
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  chunk-witness-checks:
+    name: Host-mode chunk witness regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0
+        with:
+          toolchain: nightly-2026-03-17
+
+      - name: Run chunk witness checks
+        run: make test-chunk-witness-checks
