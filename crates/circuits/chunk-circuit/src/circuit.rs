@@ -43,6 +43,11 @@ impl Circuit for ChunkCircuit {
     fn validate(witness: Self::Witness) -> Self::PublicInputs {
         let version = Version::from(witness.version);
         assert_eq!(version.fork, witness.fork_name);
+        assert_eq!(
+            witness.validium.is_some(),
+            version.is_validium(),
+            "validium inputs must be present exactly for the validium domain"
+        );
 
         let chunk_info = ChunkInfo::try_from(witness).expect("failed to execute chunk");
         (chunk_info, version)

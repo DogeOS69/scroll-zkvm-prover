@@ -121,7 +121,7 @@ impl<T: Deref<Target = [RecoveredBlock<Block>]>> ChunkExt for T {
         {
             let secret_key = SecretKey::try_from_bytes(secret_key).expect("valid secret key");
 
-            for (block, validium_txs) in blocks.iter().zip(validium_txs.iter()) {
+            for (block, validium_txs) in blocks.iter().zip_eq(validium_txs.iter()) {
                 rolling_hash = block
                     .hash_msg_queue(&rolling_hash, Some((validium_txs.as_slice(), &secret_key)));
             }

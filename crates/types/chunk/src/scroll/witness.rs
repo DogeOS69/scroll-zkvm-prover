@@ -18,7 +18,8 @@ pub struct ChunkWitness {
     pub prev_msg_queue_hash: B256,
     /// The code version specify the chain spec
     pub fork_name: ForkName,
-    /// The compression info for each block in the chunk.
+    /// The compression infos for each block in the chunk, one per transaction. Untrusted prover
+    /// data: the counts are checked before execution.
     pub compression_infos: Vec<ScrollTxCompressionInfos>,
     /// Validium encrypted txs and secret key if this is a validium chain.
     pub validium: Option<ValidiumInputs>,
