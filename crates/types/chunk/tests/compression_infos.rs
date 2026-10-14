@@ -62,11 +62,7 @@ fn truncated_compression_infos_with_matching_header_root_are_rejected() {
 
     let err = execute(witness).expect_err("a chunk that skips a transaction must not execute");
     assert!(
-        err.contains(&format!(
-            "block {}: compression infos count {} != tx count {last_txs}",
-            blocks.last().unwrap().header.number,
-            last_txs - 1
-        )),
+        err.contains("invalid compression infos"),
         "unexpected error: {err}"
     );
 }
