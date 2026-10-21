@@ -122,3 +122,6 @@ test-bundle-local:
 
 test-e2e-bundle:
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test bundle_circuit e2e -- --exact --nocapture
+
+test-tsuki-batch-metadata:
+	@cargo test $(CARGO_CONFIG_FLAG) -p scroll-zkvm-integration --test batch_circuit test_tsuki_golden_batch_metadata -- --exact --nocapture

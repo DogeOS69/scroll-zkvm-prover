@@ -8,6 +8,9 @@ use crate::{
 /// Represents public-input values for a batch.
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct BatchInfo {
+    /// Authenticated execution boundary; mandatory for Tsuki PI.
+    #[serde(default)]
+    pub boundary: Option<super::boundary::BatchBoundary>,
     /// The state root before applying the batch.
     pub parent_state_root: B256,
     /// The batch hash of the parent batch.
@@ -199,6 +202,12 @@ impl BatchInfo {
             .chain(self.next_message_index.to_be_bytes().as_slice())
             .chain(self.prev_msg_queue_hash.as_slice())
             .chain(self.post_msg_queue_hash.as_slice())
+            .chain(
+                self.boundary
+                    .expect("Tsuki batch boundary is required")
+                    .to_bytes()
+                    .as_slice(),
+            )
             .copied()
             .collect()
     }
@@ -234,6 +243,18 @@ impl MultiVersionPublicInputs for BatchInfo {
         assert_eq!(self.parent_batch_hash, prev_pi.batch_hash);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
 
+        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V11) {
+            self.boundary
+                .expect("Tsuki batch boundary is required")
+                .validate_parent(
+                    prev_pi
+                        .boundary
+                        .expect("Tsuki batch boundary is required")
+                        .last_block,
+                )
+                .expect("invalid batch boundary");
+        }
+
         // Scroll@v11 commits next_message_index into the PI, so it must not regress.
         if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V11) {
             assert!(
@@ -267,6 +288,22 @@ mod tests {
 
     fn sample_batch_info(next_message_index: u64) -> BatchInfo {
         BatchInfo {
+            boundary: Some(super::super::boundary::BatchBoundary {
+                prev_blockhash: B256::repeat_byte(1),
+                first_block: super::super::boundary::BlockHeaderContext {
+                    number: 1,
+                    timestamp: 100,
+                    gas_limit: 20_000_000,
+                },
+                last_block: super::super::boundary::BlockBoundary {
+                    hash: B256::repeat_byte(2),
+                    context: super::super::boundary::BlockHeaderContext {
+                        number: 2,
+                        timestamp: 101,
+                        gas_limit: 20_000_000,
+                    },
+                },
+            }),
             parent_state_root: B256::repeat_byte(0x11),
             parent_batch_hash: B256::repeat_byte(0x22),
             state_root: B256::repeat_byte(0x33),
@@ -282,6 +319,15 @@ mod tests {
 
     fn next_contiguous_batch(prev: &BatchInfo, next_message_index: u64) -> BatchInfo {
         BatchInfo {
+            boundary: Some(super::super::boundary::BatchBoundary {
+                prev_blockhash: prev.boundary.unwrap().last_block.hash,
+                first_block: super::super::boundary::BlockHeaderContext {
+                    number: prev.boundary.unwrap().last_block.context.number + 1,
+                    timestamp: 102,
+                    gas_limit: 20_000_000,
+                },
+                ..sample_batch_info(next_message_index).boundary.unwrap()
+            }),
             parent_state_root: prev.state_root,
             parent_batch_hash: prev.batch_hash,
             prev_msg_queue_hash: prev.post_msg_queue_hash,
@@ -316,7 +362,7 @@ mod tests {
     fn tsuki_batch_pi_layout_commits_next_message_index() {
         let pi = sample_batch_info(0x0102_0304_0506_0708).pi_tsuki(Version::tsuki());
 
-        assert_eq!(pi.len(), 241);
+        assert_eq!(pi.len(), 353);
         assert_eq!(pi[0], Version::tsuki().as_version_byte());
         assert_eq!(&pi[169..177], &0x0102_0304_0506_0708u64.to_be_bytes());
         assert_eq!(&pi[177..209], B256::repeat_byte(0x66).as_slice());

@@ -159,6 +159,17 @@ fn test_tsuki_golden_batch_metadata() -> eyre::Result<()> {
     let info = metadata_from_batch_witnesses(&witness)?;
     assert_eq!(info.chain_id, 6_281_971);
     assert_eq!(info.next_message_index, 1);
+    let boundary = info.boundary.expect("Tsuki boundary");
+    assert_eq!(boundary.first_block.number, 1);
+    assert_eq!(boundary.last_block.context.number, 26);
+    assert_eq!(
+        boundary.prev_blockhash,
+        witness.chunk_infos[0].prev_blockhash
+    );
+    assert_eq!(
+        boundary.last_block.hash,
+        witness.chunk_infos.last().unwrap().post_blockhash
+    );
     assert_eq!(
         info.parent_state_root,
         b256!("8938aed386448da2e825974f29a8f14a862bfa9f94973a8cea261542ff8792a1")
@@ -169,7 +180,7 @@ fn test_tsuki_golden_batch_metadata() -> eyre::Result<()> {
     );
     assert_eq!(
         info.pi_hash_by_version(Version::tsuki()),
-        b256!("f2e2bce630d2991ae1dc8dd95101f718d35b72b569e1596551b0c2079a1e5c39")
+        b256!("a6c79a3958bea5357d573b14e18dd9ee6961b84230e108b4ca24a4c8b145aa0b")
     );
 
     Ok(())

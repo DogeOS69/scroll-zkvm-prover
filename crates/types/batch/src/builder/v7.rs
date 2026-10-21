@@ -121,6 +121,16 @@ impl<P: Payload> super::BatchInfoBuilder for GenericBatchInfoBuilderV7<P> {
         );
 
         BatchInfo {
+            boundary: if matches!(version.stf_version, types_base::version::STFVersion::V11) {
+                Some(
+                    types_base::public_inputs::scroll::boundary::BatchBoundary::from_chunks(
+                        first_chunk,
+                        last_chunk,
+                    ),
+                )
+            } else {
+                None
+            },
             parent_state_root: first_chunk.prev_state_root,
             parent_batch_hash: args.header.parent_batch_hash(),
             state_root: last_chunk.post_state_root,
