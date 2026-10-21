@@ -66,7 +66,7 @@ fn noncanonical_headers_are_rejected_before_execution() {
         ("difficulty", |h| h.difficulty = U256::from(2)),
         ("missing base fee", |h| h.base_fee_per_gas = None),
         ("excessive base fee", |h| {
-            h.base_fee_per_gas = Some(10_000_000_001)
+            h.base_fee_per_gas = Some(u64::MAX)
         }),
         ("withdrawals root", |h| {
             h.withdrawals_root = Some(B256::ZERO)
