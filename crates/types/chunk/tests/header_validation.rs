@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{TSUKI_VERSION_BYTE, tsuki_blocks};
+use common::{TSUKI_VERSION_BYTE, tsuki_blocks, tsuki_blocks_range};
 use sbv_core::verifier;
 use sbv_primitives::{
     B256, U256,
@@ -13,6 +13,24 @@ use sbv_primitives::{
 };
 use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
 use types_base::fork_name::ForkName;
+use types_base::{public_inputs::MultiVersionPublicInputs, version::Version};
+
+#[test]
+fn golden_tsuki_chunks_have_valid_boundaries() {
+    let mut previous = None;
+    let mut queue_hash = B256::ZERO;
+    for range in [1..=8, 9..=16, 17..=20, 21..=26] {
+        let blocks = tsuki_blocks_range(range);
+        let witness =
+            ChunkWitness::new_scroll(TSUKI_VERSION_BYTE, &blocks, queue_hash, ForkName::Tsuki);
+        let info = execute(witness).expect("golden chunk must execute");
+        if let Some(previous) = &previous {
+            info.validate(previous, Version::tsuki());
+        }
+        queue_hash = info.post_msg_queue_hash;
+        previous = Some(info);
+    }
+}
 
 #[test]
 fn changed_nonce_preserves_execution_but_is_rejected_by_chunk() {
@@ -77,5 +95,23 @@ fn noncanonical_headers_are_rejected_before_execution() {
                 "{name}: {error}"
             );
         }
+    }
+}
+
+#[test]
+fn chunk_rejects_invalid_parent_header_relationships() {
+    let blocks = tsuki_blocks();
+    let parent = &blocks[blocks.len() - 2].header;
+    for backwards_timestamp in [true, false] {
+        let mut witness =
+            ChunkWitness::new_scroll(TSUKI_VERSION_BYTE, &blocks, B256::ZERO, ForkName::Tsuki);
+        let header = &mut witness.blocks.last_mut().unwrap().header;
+        if backwards_timestamp {
+            header.timestamp = parent.timestamp - 1;
+        } else {
+            header.gas_limit = parent.gas_limit + parent.gas_limit / 1024 + 1;
+        }
+        let error = execute(witness).expect_err("parent header rules must be enforced");
+        assert!(error.starts_with("invalid header at block 8:"), "{error}");
     }
 }

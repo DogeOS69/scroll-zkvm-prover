@@ -229,10 +229,10 @@ fn test_tsuki_golden_chunk_metadata() -> eyre::Result<()> {
             .map(|info| info.pi_hash_by_version(version))
             .collect::<Vec<_>>(),
         [
-            b256!("7b3380e55fad46c4f7804ba37b806a9f9dfc919fcf6f2972c852499eaa1cc78b"),
-            b256!("720e5709fe10939a00ae0a4db6330e1c6c7b9dce3bb3e941e98a41d99353942b"),
-            b256!("0486b4566482a0faf7aa8acddfb1ad1a94ac050ac57f609ef4899591ae31f0bf"),
-            b256!("30cee89d50e457eb43ac6a3646a01b07af327fc7fb1309877b221718c14bd44d"),
+            b256!("85fc30615226bf7b34490f9433609f7270ea716f9b95e6fb503cbe3d0eeacbf1"),
+            b256!("2b174dbb30e32f38cdb384a773952cfedf186ee8ded2f82f84843c39bfc47aa3"),
+            b256!("dc0a5182ee66e540481cb7083ddb50aea431fd5f083e880fa73e6cf5f0665d6f"),
+            b256!("d2222c48c4fcfce8050f1595b47bb7936beb2db83da75e696e92ac33f6bbcd7c"),
         ]
     );
 

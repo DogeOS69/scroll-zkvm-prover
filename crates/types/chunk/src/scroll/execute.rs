@@ -51,11 +51,22 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
     // Earlier forks retain their historical header format. Tsuki proofs must use the same
     // canonical header rules as the execution client, even though SBV only executes transactions.
     if witness.fork_name >= ForkName::Tsuki {
+        let mut parent = None;
         for block in &witness.blocks {
             let header = SealedHeader::new_unhashed(block.header.clone());
-            DogeosConsensus.validate_header(&header).map_err(|error| {
-                format!("invalid header at block {}: {error}", block.header.number)
-            })?;
+            DogeosConsensus
+                .validate_header(&header)
+                .and_then(|()| {
+                    if let Some(parent) = &parent {
+                        DogeosConsensus.validate_header_against_parent(&header, parent)
+                    } else {
+                        Ok(())
+                    }
+                })
+                .map_err(|error| {
+                    format!("invalid header at block {}: {error}", block.header.number)
+                })?;
+            parent = Some(header);
         }
     }
 
