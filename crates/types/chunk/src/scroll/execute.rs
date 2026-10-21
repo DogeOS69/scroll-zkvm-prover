@@ -8,7 +8,10 @@ use sbv_primitives::{
     hardforks::Hardfork,
     types::{
         consensus::BlockHeader,
-        reth::primitives::{Block, RecoveredBlock},
+        reth::{
+            consensus::{DogeosConsensus, HeaderValidator},
+            primitives::{Block, RecoveredBlock, SealedHeader},
+        },
     },
 };
 use types_base::{
@@ -44,6 +47,18 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         ForkName::GalileoV2 => Hardfork::GalileoV2,
         ForkName::Tsuki => Hardfork::Tsuki,
     };
+
+    // Earlier forks retain their historical header format. Tsuki proofs must use the same
+    // canonical header rules as the execution client, even though SBV only executes transactions.
+    if witness.fork_name >= ForkName::Tsuki {
+        for block in &witness.blocks {
+            let header = SealedHeader::new_unhashed(block.header.clone());
+            DogeosConsensus.validate_header(&header).map_err(|error| {
+                format!("invalid header at block {}: {error}", block.header.number)
+            })?;
+        }
+    }
+
     let chain_spec = build_chain_spec_force_hardfork(chain, hardfork);
 
     let VerifyResult {

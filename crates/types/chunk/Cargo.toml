@@ -42,6 +42,10 @@ openvm-pairing-guest = { workspace = true, features = ["bn254", "halo2curves"] }
 serde_json.workspace = true
 
 [[test]]
+name = "header_validation"
+required-features = ["scroll", "host"]
+
+[[test]]
 name = "compression_infos"
 required-features = ["scroll", "host"]
 
@@ -57,6 +61,7 @@ scroll = [
   "sbv-primitives/scroll-evm-types",
   "sbv-primitives/scroll-hardforks",
   "sbv-primitives/scroll-revm-types",
+  "sbv-primitives/scroll-reth-consensus-types",
   "sbv-primitives/scroll-reth-evm-types",
 ]
 scroll-compress-info = ["sbv-core/scroll-compress-info"]
