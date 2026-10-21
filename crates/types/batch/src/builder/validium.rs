@@ -54,6 +54,7 @@ impl ValidiumBatchInfoBuilder {
         assert_eq!(last_chunk.withdraw_root, args.header.withdraw_root());
 
         BatchInfo {
+            boundary: None,
             parent_state_root: first_chunk.prev_state_root,
             parent_batch_hash: args.header.parent_batch_hash(),
             state_root: last_chunk.post_state_root,

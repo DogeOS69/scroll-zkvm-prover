@@ -45,6 +45,7 @@ impl super::BatchInfoBuilder for BatchInfoBuilderV6 {
         let (first, last) = payload.validate(&args.header, args.chunk_infos.as_slice());
 
         BatchInfo {
+            boundary: None,
             parent_state_root: first.prev_state_root,
             parent_batch_hash: args.header.parent_batch_hash,
             state_root: last.post_state_root,
