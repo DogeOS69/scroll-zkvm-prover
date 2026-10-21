@@ -1,5 +1,9 @@
 FROM rust:1.86
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates=20250419~deb12u2 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ARG OPENVM_RUST_TOOLCHAIN=nightly-2026-03-17
