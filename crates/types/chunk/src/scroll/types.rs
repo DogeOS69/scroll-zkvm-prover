@@ -217,21 +217,8 @@ impl BlockExt for RecoveredBlock<Block> {
     ) -> B256 {
         let mut rolling_hash = *initial_queue_hash;
 
-        let mut buffer = [0u8; { size_of::<B256>() * 2 }];
-        buffer[..32].copy_from_slice(rolling_hash.as_ref());
-
         let mut hash_tx = |tx_hash: B256| {
-            buffer[..size_of::<B256>()].copy_from_slice(rolling_hash.as_ref());
-            buffer[size_of::<B256>()..].copy_from_slice(tx_hash.as_ref());
-
-            rolling_hash = keccak256(buffer);
-            // clear last 32 bits, i.e. 4 bytes.
-            // https://github.com/scroll-tech/da-codec/blob/26dc8d575244560611548fada6a3a2745c60fe83/encoding/da.go#L817-L825
-            // see also https://github.com/scroll-tech/da-codec/pull/42
-            rolling_hash.0[28] = 0;
-            rolling_hash.0[29] = 0;
-            rolling_hash.0[30] = 0;
-            rolling_hash.0[31] = 0;
+            rolling_hash = hash_msg_queue_step(rolling_hash, tx_hash);
         };
 
         if let Some((txs, secret_key)) = validium_txs {
@@ -255,5 +242,68 @@ impl BlockExt for RecoveredBlock<Block> {
         };
 
         rolling_hash
+    }
+}
+
+/// DogeOS uses the entire digest, including the bytes Scroll reserves for timestamps.
+#[inline]
+fn hash_msg_queue_step(rolling_hash: B256, tx_hash: B256) -> B256 {
+    let mut buffer = [0u8; 64];
+    buffer[..32].copy_from_slice(rolling_hash.as_slice());
+    buffer[32..].copy_from_slice(tx_hash.as_slice());
+    keccak256(buffer)
+}
+
+#[cfg(test)]
+mod queue_hash_tests {
+    use super::*;
+    use alloy_primitives::{Address, Bytes, b256};
+
+    #[test]
+    fn full_width_queue_hash_vectors() {
+        // Same independent vectors as dogeos-core and rollup-node.
+        let first = hash_msg_queue_step(B256::ZERO, B256::ZERO);
+        assert_eq!(
+            first,
+            b256!("ad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5")
+        );
+        assert_eq!(
+            hash_msg_queue_step(first, B256::repeat_byte(1)),
+            b256!("760121498932758a8b6e34be15314cb69ad8a8a80f94f1d332797f4d61a8bfc6")
+        );
+    }
+
+    #[test]
+    fn block_queue_hash_preserves_empty_seed_and_full_intermediate_digest() {
+        let seed = B256::repeat_byte(0xAB);
+        let empty = RecoveredBlock::new_unhashed(Block::default(), vec![]);
+        assert_eq!(empty.hash_msg_queue(&seed, None), seed);
+        let first = TxL1Message {
+            queue_index: 0,
+            gas_limit: 21000,
+            sender: Address::ZERO,
+            to: Address::ZERO,
+            value: U256::ZERO,
+            input: Bytes::new(),
+        };
+        let second = TxL1Message {
+            queue_index: 1,
+            ..first.clone()
+        };
+        let first_hash = keccak256([seed.as_slice(), first.tx_hash().as_slice()].concat());
+        let expected = keccak256([first_hash.as_slice(), second.tx_hash().as_slice()].concat());
+        assert_ne!(&first_hash[28..], &[0; 4]);
+        assert_ne!(&expected[28..], &[0; 4]);
+        let mut block = Block::default();
+        let messages = [first, second];
+        block.body.transactions = messages.iter().cloned().map(Into::into).collect();
+        let recovered = RecoveredBlock::new_unhashed(block, vec![Address::ZERO; 2]);
+        assert_eq!(recovered.hash_msg_queue(&seed, None), expected);
+        // Validium messages follow the same full-width hash rule.
+        let secret_key = SecretKey::try_from_bytes([1u8; 32]).unwrap();
+        assert_eq!(
+            recovered.hash_msg_queue(&seed, Some((&messages, &secret_key))),
+            expected
+        );
     }
 }
