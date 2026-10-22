@@ -5,7 +5,10 @@ use crate::{
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sbv_core::BlockWitness;
-use sbv_primitives::{B256, types::consensus::TxL1Message};
+use sbv_primitives::{
+    B256,
+    types::{Header, consensus::TxL1Message},
+};
 use scroll_zkvm_prover::utils::read_json;
 use scroll_zkvm_prover::utils::vm::ExecutionResult;
 use scroll_zkvm_types::{
@@ -105,6 +108,26 @@ fn initial_prev_message_hash(version: Version) -> B256 {
     }
 }
 
+/// The trusted header of the block before a chunk's first block.
+///
+/// It is the witness of the preceding block when the corpus has one, and otherwise the header in
+/// `<witnesses_dir>/parent.json`, which is how a corpus that starts at the chain's first block
+/// carries its genesis header. A corpus with neither returns `None`, which only the forks before
+/// Tsuki accept.
+pub fn read_parent_header(witnesses_dir: &Path, first_block: u64) -> eyre::Result<Option<Header>> {
+    if let Some(previous) = first_block.checked_sub(1) {
+        let path = witnesses_dir.join(format!("{previous}.json"));
+        if path.exists() {
+            return Ok(Some(read_block_witness(path)?.header));
+        }
+    }
+    let path = witnesses_dir.join("parent.json");
+    if path.exists() {
+        return Ok(Some(read_json(path)?));
+    }
+    Ok(None)
+}
+
 impl ChunkTaskGenerator {
     pub fn get_or_build_witness(&mut self) -> eyre::Result<ChunkWitness> {
         if let Some(witness) = &self.witness {
@@ -148,6 +171,14 @@ impl ChunkTaskGenerator {
             .map(read_block_witness)
             .collect::<eyre::Result<Vec<BlockWitness>>>()?;
 
+        let parent_header = read_parent_header(
+            &Path::new(PATH_TESTDATA).join(dir_name).join("witnesses"),
+            block_witnesses
+                .first()
+                .map(|witness| witness.header.number)
+                .unwrap_or_default(),
+        )?;
+
         let witness = if self.version.is_validium() {
             let base_dir = Path::new(PATH_TESTDATA).join("validium").join("witnesses");
             let secret_key = hex::decode(std::env::var("VALIDIUM_KEY")?)?;
@@ -165,6 +196,7 @@ impl ChunkTaskGenerator {
                 self.version.fork,
                 validium_txs,
                 secret_key,
+                parent_header,
             )
         } else {
             ChunkWitness::new_scroll(
@@ -173,6 +205,7 @@ impl ChunkTaskGenerator {
                 self.prev_message_hash
                     .unwrap_or_else(|| initial_prev_message_hash(self.version)),
                 self.version.fork,
+                parent_header,
             )
         };
 
@@ -195,12 +228,22 @@ pub fn get_witness_from_env_or_builder(
         .collect::<eyre::Result<Vec<BlockWitness>>>()?;
 
     let version = testing_version().as_version_byte();
+    let parent_header = read_parent_header(
+        &Path::new(PATH_TESTDATA)
+            .join(effective_testdata_fork_directory(testing_hardfork()))
+            .join("witnesses"),
+        block_witnesses
+            .first()
+            .map(|witness| witness.header.number)
+            .unwrap_or_default(),
+    )?;
 
     Ok(ChunkWitness::new_scroll(
         version,
         &block_witnesses,
         initial_prev_message_hash(testing_version()),
         testing_hardfork(),
+        parent_header,
     ))
 }
 

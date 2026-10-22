@@ -1,13 +1,14 @@
 use super::types::validium::SecretKey;
 use alloy_primitives::B256;
 use sbv_core::witness::BlockWitness;
-use sbv_primitives::types::consensus::TxL1Message;
 use sbv_primitives::types::evm::ScrollTxCompressionInfos;
+use sbv_primitives::types::{Header, consensus::TxL1Message};
 use std::collections::HashSet;
 use types_base::version::Version;
 use types_base::{fork_name::ForkName, public_inputs::scroll::chunk::ChunkInfo};
 
 /// The witness type accepted by the chunk-circuit.
+#[serde_with::serde_as]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ChunkWitness {
     /// Version byte as per [version][types_base::version].
@@ -23,6 +24,14 @@ pub struct ChunkWitness {
     pub compression_infos: Vec<ScrollTxCompressionInfos>,
     /// Validium encrypted txs and secret key if this is a validium chain.
     pub validium: Option<ValidiumInputs>,
+    /// The header of the block before the chunk's first block.
+    ///
+    /// Its hash is the chunk's previous proof endpoint and its state root is the state the chunk
+    /// starts from, so from Tsuki onwards it is what anchors the chunk to the chain. Earlier
+    /// forks keep their historical behaviour and leave it absent.
+    #[serde(default)]
+    #[serde_as(as = "Option<sbv_primitives::types::consensus::serde_bincode_compat::Header>")]
+    pub parent_header: Option<Header>,
 }
 
 /// The validium inputs for the chunk witness.
@@ -47,8 +56,16 @@ impl ChunkWitness {
         blocks: &[BlockWitness],
         prev_msg_queue_hash: B256,
         fork_name: ForkName,
+        parent_header: Option<Header>,
     ) -> Self {
-        Self::new(version, blocks, prev_msg_queue_hash, fork_name, None)
+        Self::new(
+            version,
+            blocks,
+            prev_msg_queue_hash,
+            fork_name,
+            None,
+            parent_header,
+        )
     }
 
     pub fn new_validium(
@@ -58,6 +75,7 @@ impl ChunkWitness {
         fork_name: ForkName,
         validium_txs: Vec<Vec<TxL1Message>>,
         secret_key: SecretKey,
+        parent_header: Option<Header>,
     ) -> Self {
         Self::new(
             version,
@@ -68,6 +86,7 @@ impl ChunkWitness {
                 validium_txs,
                 secret_key: secret_key.to_bytes(),
             }),
+            parent_header,
         )
     }
 
@@ -77,6 +96,7 @@ impl ChunkWitness {
         prev_msg_queue_hash: B256,
         fork_name: ForkName,
         validium: Option<ValidiumInputs>,
+        parent_header: Option<Header>,
     ) -> Self {
         let num_codes = blocks.iter().map(|w| w.codes.len()).sum();
         let mut codes = HashSet::with_capacity(num_codes);
@@ -119,6 +139,7 @@ impl ChunkWitness {
             fork_name,
             compression_infos,
             validium,
+            parent_header,
         }
     }
 

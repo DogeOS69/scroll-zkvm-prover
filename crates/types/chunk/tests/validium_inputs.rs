@@ -8,7 +8,7 @@
 
 mod common;
 
-use common::{TSUKI_VERSION_BYTE, tsuki_blocks};
+use common::{TSUKI_VERSION_BYTE, base_fee_chunk};
 use sbv_primitives::B256;
 use scroll_zkvm_types_chunk::scroll::{ChunkWitness, ValidiumInputs, execute};
 use types_base::{fork_name::ForkName, version::Version};
@@ -22,10 +22,15 @@ fn validium_inputs(lists: usize) -> ValidiumInputs {
 
 #[test]
 fn scroll_domain_chunk_with_validium_inputs_is_rejected() {
-    let blocks = tsuki_blocks();
+    let (parent, blocks) = base_fee_chunk();
     for lists in [0, blocks.len()] {
-        let mut witness =
-            ChunkWitness::new_scroll(TSUKI_VERSION_BYTE, &blocks, B256::ZERO, ForkName::Tsuki);
+        let mut witness = ChunkWitness::new_scroll(
+            TSUKI_VERSION_BYTE,
+            &blocks,
+            B256::ZERO,
+            ForkName::Tsuki,
+            Some(parent.clone()),
+        );
         witness.validium = Some(validium_inputs(lists));
 
         let err = execute(witness).expect_err("a Scroll chunk must not take validium inputs");
@@ -35,12 +40,14 @@ fn scroll_domain_chunk_with_validium_inputs_is_rejected() {
 
 #[test]
 fn validium_domain_chunk_without_validium_inputs_is_rejected() {
+    let (parent, blocks) = base_fee_chunk();
     let witness = ChunkWitness::new(
         Version::validium_v1().as_version_byte(),
-        &tsuki_blocks(),
+        &blocks,
         B256::ZERO,
         ForkName::Tsuki,
         None,
+        Some(parent),
     );
 
     let err = execute(witness).expect_err("a validium chunk needs validium inputs");
@@ -49,7 +56,7 @@ fn validium_domain_chunk_without_validium_inputs_is_rejected() {
 
 #[test]
 fn validium_inputs_need_one_list_per_block() {
-    let blocks = tsuki_blocks();
+    let (parent, blocks) = base_fee_chunk();
     for lists in [0, blocks.len() - 1, blocks.len() + 1] {
         let witness = ChunkWitness::new(
             Version::validium_v1().as_version_byte(),
@@ -57,6 +64,7 @@ fn validium_inputs_need_one_list_per_block() {
             B256::ZERO,
             ForkName::Tsuki,
             Some(validium_inputs(lists)),
+            Some(parent.clone()),
         );
 
         let err = execute(witness).expect_err("validium lists must match the blocks");

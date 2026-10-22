@@ -44,6 +44,23 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         ForkName::GalileoV2 => Hardfork::GalileoV2,
         ForkName::Tsuki => Hardfork::Tsuki,
     };
+
+    // From Tsuki the chunk opens the header of the block before its first block: that header's
+    // hash is the chunk's previous proof endpoint, and its state root is the state the chunk
+    // starts from. SBV takes it from here, checks the chunk against it, and runs the shared
+    // DogeOS header rules over the whole chain of headers starting from it - including the ones
+    // that relate each header to its predecessor, which is why they are not repeated here.
+    let parent_header = if witness.fork_name >= ForkName::Tsuki {
+        Some(
+            witness
+                .parent_header
+                .as_ref()
+                .ok_or("missing parent header for a Tsuki chunk")?,
+        )
+    } else {
+        None
+    };
+
     let chain_spec = build_chain_spec_force_hardfork(chain, hardfork);
 
     let VerifyResult {
@@ -53,8 +70,21 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         withdraw_root,
         next_message_index,
         ..
-    } = verifier::run(&witness.blocks, chain_spec, witness.compression_infos)
-        .map_err(|e| format!("verify error: {e}"))?;
+    } = verifier::run(
+        &witness.blocks,
+        parent_header,
+        chain_spec,
+        witness.compression_infos,
+    )
+    .map_err(|e| format!("verify error: {e}"))?;
+
+    // Under header-anchored endpoints a chunk's endpoints are the block hashes at its boundary,
+    // carried in the slots that held state roots before. The parent's state root is still the
+    // state the chunk starts from; SBV checks that against the witness's pre-state root.
+    let (prev_endpoint, post_endpoint) = match parent_header {
+        Some(parent) => (parent.hash_slow(), post_blockhash),
+        None => (pre_state_root, post_state_root),
+    };
 
     let blocks = manually_drop_on_zkvm!(blocks);
     let mut rlp_buffer = manually_drop_on_zkvm!(Vec::with_capacity(2048));
@@ -73,8 +103,8 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
 
     let chunk_info = ChunkInfo {
         chain_id: chain.id(),
-        prev_state_root: pre_state_root,
-        post_state_root,
+        prev_state_root: prev_endpoint,
+        post_state_root: post_endpoint,
         data_hash,
         withdraw_root,
         next_message_index,

@@ -62,9 +62,17 @@ impl BlockContextV2 {
 pub struct ChunkInfo {
     /// The EIP-155 chain ID for all txs in the chunk.
     pub chain_id: u64,
-    /// The state root before applying the chunk.
+    /// The chunk's previous endpoint.
+    ///
+    /// From Tsuki this is the **L2 block hash** of the block before the chunk's first block,
+    /// which is the header the chunk opens; the field name is kept so the public-input layout and
+    /// the persisted protocol state are unchanged. Earlier forks carry the state root before the
+    /// chunk, as the name says.
     pub prev_state_root: B256,
-    /// The state root after applying the chunk.
+    /// The chunk's final endpoint.
+    ///
+    /// From Tsuki this is the **L2 block hash** of the chunk's last block, for the same reason as
+    /// [`Self::prev_state_root`]. Earlier forks carry the state root after the chunk.
     pub post_state_root: B256,
     /// The withdrawals root after applying the chunk.
     pub withdraw_root: B256,

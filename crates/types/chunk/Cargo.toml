@@ -24,6 +24,7 @@ sbv-primitives = { workspace = true, features = [
   "reth-evm-types",
 ] }
 serde.workspace = true
+serde_with.workspace = true
 thiserror.workspace = true
 openvm-ecc-guest = { workspace = true }
 openvm-k256 = { workspace = true }
@@ -42,6 +43,14 @@ openvm-pairing-guest = { workspace = true, features = ["bn254", "halo2curves"] }
 serde_json.workspace = true
 
 [[test]]
+name = "endpoints"
+required-features = ["scroll", "host"]
+
+[[test]]
+name = "header_validation"
+required-features = ["scroll", "host"]
+
+[[test]]
 name = "compression_infos"
 required-features = ["scroll", "host"]
 
@@ -57,6 +66,7 @@ scroll = [
   "sbv-primitives/scroll-evm-types",
   "sbv-primitives/scroll-hardforks",
   "sbv-primitives/scroll-revm-types",
+  "sbv-primitives/scroll-reth-consensus-types",
   "sbv-primitives/scroll-reth-evm-types",
 ]
 scroll-compress-info = ["sbv-core/scroll-compress-info"]

@@ -163,6 +163,7 @@ async fn main() -> eyre::Result<()> {
             B256::ZERO,
             Feynman,
             None,
+            None,
         ))?;
 
         if gas + gas_used > cli.chunk_gas_target * 1_000_000 {
@@ -171,6 +172,7 @@ async fn main() -> eyre::Result<()> {
                 &blocks,
                 B256::ZERO,
                 Feynman,
+                None,
                 None,
             );
             let (exec_result, gas) = exec_chunk(&wit)?;
