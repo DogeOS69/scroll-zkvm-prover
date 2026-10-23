@@ -217,21 +217,8 @@ impl BlockExt for RecoveredBlock<Block> {
     ) -> B256 {
         let mut rolling_hash = *initial_queue_hash;
 
-        let mut buffer = [0u8; { size_of::<B256>() * 2 }];
-        buffer[..32].copy_from_slice(rolling_hash.as_ref());
-
         let mut hash_tx = |tx_hash: B256| {
-            buffer[..size_of::<B256>()].copy_from_slice(rolling_hash.as_ref());
-            buffer[size_of::<B256>()..].copy_from_slice(tx_hash.as_ref());
-
-            rolling_hash = keccak256(buffer);
-            // clear last 32 bits, i.e. 4 bytes.
-            // https://github.com/scroll-tech/da-codec/blob/26dc8d575244560611548fada6a3a2745c60fe83/encoding/da.go#L817-L825
-            // see also https://github.com/scroll-tech/da-codec/pull/42
-            rolling_hash.0[28] = 0;
-            rolling_hash.0[29] = 0;
-            rolling_hash.0[30] = 0;
-            rolling_hash.0[31] = 0;
+            rolling_hash = hash_msg_queue_step(rolling_hash, tx_hash);
         };
 
         if let Some((txs, secret_key)) = validium_txs {
@@ -256,4 +243,13 @@ impl BlockExt for RecoveredBlock<Block> {
 
         rolling_hash
     }
+}
+
+/// DogeOS uses the entire digest, including the bytes Scroll reserves for timestamps.
+#[inline]
+fn hash_msg_queue_step(rolling_hash: B256, tx_hash: B256) -> B256 {
+    let mut buffer = [0u8; 64];
+    buffer[..32].copy_from_slice(rolling_hash.as_slice());
+    buffer[32..].copy_from_slice(tx_hash.as_slice());
+    keccak256(buffer)
 }
