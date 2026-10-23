@@ -74,14 +74,16 @@ fn e2e() -> eyre::Result<()> {
     Ok(())
 }
 
-/// The golden values here are the chunk's public inputs, whose `prev_state_root` and
-/// `post_state_root` slots now carry the boundary block hashes. They have to be recomputed with
-/// the corpus, and the corpus itself cannot satisfy the base-fee rule: its witnesses resolve no
-/// L2SystemConfig account and the node that produced them predates the Tsuki EIP-1559
-/// parameters. Regenerating it needs the harness that built it, with the NativeDogeToken,
-/// withdrawal and EIP-7825 coverage its own README documents - the new `tsuki-base-fee` corpus
-/// carries the chunk path's positive Tsuki coverage until then.
-#[ignore = "the 26-block Tsuki corpus cannot satisfy the base-fee rule: see crates/integration/testdata/tsuki-base-fee/README.md"]
+/// Ignored because the integration crate's test binaries do not link, on this branch and on
+/// `dogeos/main` alike: `da-codec` reaches the graph under two source spellings - `?rev=` via
+/// dogeos-reth-evm and `.git#` via vm-zstd - and both export `compress_scroll_batch_bytes_standard`
+/// unmangled, so any binary pulling both fails with a duplicate symbol. Until that is fixed this
+/// test cannot be run at all.
+///
+/// It has no golden values: its assertion is that the blob encoding is independent of how the
+/// batch is partitioned into chunks, which the endpoint change does not touch. It needs only to be
+/// runnable again.
+#[ignore = "the integration crate's test binaries do not link: duplicate da-codec symbol, pre-existing on dogeos/main"]
 #[test]
 fn verify_batch_hash_invariant() -> eyre::Result<()> {
     use scroll_zkvm_types::public_inputs::ForkName;
@@ -149,14 +151,17 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
     Ok(())
 }
 
-/// The golden values here are the chunk's public inputs, whose `prev_state_root` and
-/// `post_state_root` slots now carry the boundary block hashes. They have to be recomputed with
-/// the corpus, and the corpus itself cannot satisfy the base-fee rule: its witnesses resolve no
-/// L2SystemConfig account and the node that produced them predates the Tsuki EIP-1559
-/// parameters. Regenerating it needs the harness that built it, with the NativeDogeToken,
-/// withdrawal and EIP-7825 coverage its own README documents - the new `tsuki-base-fee` corpus
-/// carries the chunk path's positive Tsuki coverage until then.
-#[ignore = "the 26-block Tsuki corpus cannot satisfy the base-fee rule: see crates/integration/testdata/tsuki-base-fee/README.md"]
+/// Ignored because the integration crate's test binaries do not link, on this branch and on
+/// `dogeos/main` alike: `da-codec` reaches the graph under two source spellings - `?rev=` via
+/// dogeos-reth-evm and `.git#` via vm-zstd - and both export `compress_scroll_batch_bytes_standard`
+/// unmangled, so any binary pulling both fails with a duplicate symbol. Until that is fixed this
+/// test cannot be run at all.
+///
+/// Its goldens are the batch public inputs, including the two endpoints the batch takes from its
+/// first and last chunk, which are block hashes from Tsuki; they need recomputing, which needs a
+/// run. The reachable part of that property is pinned by
+/// `the_endpoints_a_batch_would_publish_are_block_hashes` in the chunk crate.
+#[ignore = "the integration crate's test binaries do not link: duplicate da-codec symbol, pre-existing on dogeos/main"]
 #[test]
 fn test_tsuki_golden_batch_metadata() -> eyre::Result<()> {
     let chunks = tsuki_golden_chunk_tasks()?

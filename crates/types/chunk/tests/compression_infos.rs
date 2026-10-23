@@ -6,6 +6,13 @@
 //!
 //! Dropping the transaction itself is caught independently, by the transactions root in its own
 //! header, which is asserted here too: the two rules close the same hole from opposite sides.
+//!
+//! One thing was traded away in moving to this corpus. The older version of the first test wrote
+//! the prefix state root - the root the chunk reaches without the skipped transaction - into the
+//! last block's header, so the witness was consistent apart from the truncated list and the test
+//! would have failed had the count check been removed. That is not constructible here: this
+//! corpus's last block is empty, and rewriting an earlier block's state root breaks the
+//! witness-chaining check first. These tests pin the two error paths instead.
 
 mod common;
 
@@ -68,8 +75,10 @@ fn a_witness_that_drops_a_transaction_is_rejected() {
         .pop();
 
     let err = execute(witness).expect_err("a chunk missing a transaction must not execute");
+    // Specifically the transactions root, so the test says which layer caught the drop.
     assert!(
-        err.contains("transaction root") || err.contains("BodyTransactionRootDiff"),
+        err.starts_with("verify error: body validation failed for block 1:")
+            && err.contains("transaction root"),
         "unexpected error: {err}"
     );
 }

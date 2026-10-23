@@ -100,7 +100,7 @@ fn dogeos_next_message_index_committed_fixture() -> Result<()> {
     // From Tsuki the chunk opens the header of the block before its first block. The fixture
     // carries it as the preceding block's witness, or as `witnesses/parent.json` when the range
     // starts at the chain's first block.
-    let parent_header = read_parent_header(&witnesses_dir, manifest.block_start)?;
+    let parent_header = read_parent_header(&witnesses_dir, manifest.block_start, ForkName::Tsuki)?;
     let witness = ChunkWitness::new_scroll(
         version.as_version_byte(),
         &blocks,

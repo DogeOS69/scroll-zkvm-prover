@@ -100,7 +100,7 @@ fn a_tsuki_chunk_without_a_parent_header_is_rejected() {
 
     assert_eq!(
         execute(witness).expect_err("a Tsuki chunk must carry its parent header"),
-        "missing parent header for a Tsuki chunk"
+        format!("missing parent header for a {} chunk", ForkName::Tsuki)
     );
 }
 

@@ -170,14 +170,16 @@ fn test_execute_multi() -> eyre::Result<()> {
     Ok(())
 }
 
-/// The golden values here are the chunk's public inputs, whose `prev_state_root` and
-/// `post_state_root` slots now carry the boundary block hashes. They have to be recomputed with
-/// the corpus, and the corpus itself cannot satisfy the base-fee rule: its witnesses resolve no
-/// L2SystemConfig account and the node that produced them predates the Tsuki EIP-1559
-/// parameters. Regenerating it needs the harness that built it, with the NativeDogeToken,
-/// withdrawal and EIP-7825 coverage its own README documents - the new `tsuki-base-fee` corpus
-/// carries the chunk path's positive Tsuki coverage until then.
-#[ignore = "the 26-block Tsuki corpus cannot satisfy the base-fee rule: see crates/integration/testdata/tsuki-base-fee/README.md"]
+/// Ignored because the integration crate's test binaries do not link, on this branch and on
+/// `dogeos/main` alike: `da-codec` reaches the graph under two source spellings - `?rev=` via
+/// dogeos-reth-evm and `.git#` via vm-zstd - and both export `compress_scroll_batch_bytes_standard`
+/// unmangled, so any binary pulling both fails with a duplicate symbol. Until that is fixed this
+/// test cannot be run at all.
+///
+/// Its goldens are the chunk public inputs over the Tsuki corpus, and they have to be recomputed
+/// twice over: the corpus is now `tsuki-base-fee` (two chunks, not four), and the endpoint slots
+/// carry block hashes. Computing them needs a run, which is what the link failure prevents.
+#[ignore = "the integration crate's test binaries do not link: duplicate da-codec symbol, pre-existing on dogeos/main"]
 #[test]
 fn test_tsuki_golden_chunk_metadata() -> eyre::Result<()> {
     let version = Version::tsuki();

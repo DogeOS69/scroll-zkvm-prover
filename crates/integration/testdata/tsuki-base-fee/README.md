@@ -18,7 +18,14 @@ The L2SystemConfig contract is a genesis predeploy with its slot unset, so block
 on the default overhead and 5–7 on the configured one. `witnesses/parent.json` is the chain's
 genesis header: the first chunk is anchored to it, so its hash is the chain's first proof endpoint.
 
-`provenance.json` records the node commit, the chain id and the overhead values. The corpus and
+`witnesses/parent.json` and `witnesses/N.json` are written differently, and regenerating either by
+hand is where that bites: `parent.json` is an `eth_getBlockByNumber` block object (camelCase, with
+`hash`, `size`, `transactions` and `uncles` alongside the header fields), while a witness carries
+its header in the struct's own field names. Copying a witness's `header` object into `parent.json`
+does not parse. `read_parent_header` reads the two with different deserializers for that reason.
+
+`provenance.json` records the node commit, the sbv commit the corpus was taken from, the chain id
+and the overhead values; `SHA256SUMS` pins the bytes and `make test-tsuki-golden` checks it. The corpus and
 its reproduction live in the stateless-block-verifier repository, under
 `testdata/dogeos/base-fee-rule/`, which also carries the two sibling chains covering an absent
 L2SystemConfig account and the development chain.

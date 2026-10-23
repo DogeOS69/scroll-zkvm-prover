@@ -19,13 +19,20 @@ use types_base::{
 
 /// Executes the chunk and derives its public inputs.
 ///
-/// `compression_infos` and `validium` are untrusted prover data: their shapes are checked against
-/// the blocks and the version before anything is executed or hashed.
+/// `version`, `fork_name`, `parent_header`, `compression_infos` and `validium` are all untrusted
+/// prover data, and between them they select which rules the chunk is held to: `fork_name` decides
+/// whether the chunk is anchored and whether the base-fee rule applies, and `version` decides the
+/// public-input layout and the domain. They are checked against each other and against the blocks
+/// before anything is executed or hashed.
 pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
+    if witness.blocks.is_empty() {
+        return Err("a chunk has no blocks".to_string());
+    }
+    check_version_fork(&witness)?;
     check_validium_inputs(&witness)?;
+    check_parent_header(&witness)?;
 
     let chain = Chain::from_id(witness.blocks[0].chain_id);
-    let prev_blockhash = witness.blocks[0].header.parent_hash();
     let post_blockhash = witness
         .blocks
         .last()
@@ -50,16 +57,8 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
     // starts from. SBV takes it from here, checks the chunk against it, and runs the shared
     // DogeOS header rules over the whole chain of headers starting from it - including the ones
     // that relate each header to its predecessor, which is why they are not repeated here.
-    let parent_header = if witness.fork_name >= ForkName::Tsuki {
-        Some(
-            witness
-                .parent_header
-                .as_ref()
-                .ok_or("missing parent header for a Tsuki chunk")?,
-        )
-    } else {
-        None
-    };
+    // `check_parent_header` has already established that it is present exactly when it is needed.
+    let parent_header = witness.parent_header.as_ref();
 
     let chain_spec = build_chain_spec_force_hardfork(chain, hardfork);
 
@@ -81,9 +80,20 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
     // Under header-anchored endpoints a chunk's endpoints are the block hashes at its boundary,
     // carried in the slots that held state roots before. The parent's state root is still the
     // state the chunk starts from; SBV checks that against the witness's pre-state root.
-    let (prev_endpoint, post_endpoint) = match parent_header {
-        Some(parent) => (parent.hash_slow(), post_blockhash),
-        None => (pre_state_root, post_state_root),
+    //
+    // `prev_blockhash` is taken from the trusted parent too, rather than from the first block's
+    // own `parent_hash`: SBV checks the two against each other, and this way the published field
+    // is derived from the header that was checked rather than from the witness's copy of its hash.
+    let (prev_endpoint, post_endpoint, prev_blockhash) = match parent_header {
+        Some(parent) => {
+            let parent_hash = parent.hash_slow();
+            (parent_hash, post_blockhash, parent_hash)
+        }
+        None => (
+            pre_state_root,
+            post_state_root,
+            witness.blocks[0].header.parent_hash(),
+        ),
     };
 
     let blocks = manually_drop_on_zkvm!(blocks);
@@ -133,6 +143,45 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
 /// Validium inputs must be present exactly when the version's domain is validium, with one list
 /// of validium transactions per block. Otherwise the rolling message queue hash would cover a
 /// different set of L1 messages from the one that was executed.
+/// The fork the chunk claims has to be the fork its version byte names.
+///
+/// `fork_name` selects the rules - whether the chunk is anchored to a parent header at all, and
+/// whether the base-fee rule applies - while `version` selects the public-input layout the result
+/// is serialised into. The guest asserts the same equality before it commits anything, so a proof
+/// cannot pair the legacy state-root path with a Tsuki public input; this is the host-side half, so
+/// that metadata derived outside the guest cannot either.
+fn check_version_fork(witness: &ChunkWitness) -> Result<(), String> {
+    let version = Version::from(witness.version);
+    if version.fork != witness.fork_name {
+        return Err(format!(
+            "fork {} does not match the fork of version byte {}, which is {}",
+            witness.fork_name, witness.version, version.fork
+        ));
+    }
+    Ok(())
+}
+
+/// The trusted parent header has to be present exactly when the chunk is anchored to one.
+///
+/// Both directions matter. Without it a Tsuki chunk has nothing binding its first block, its
+/// pre-state root or its published previous endpoint. With it on an earlier fork, anchoring data
+/// would be supplied, accepted and then silently discarded - the same mistake
+/// [`check_validium_inputs`] refuses for the validium inputs.
+fn check_parent_header(witness: &ChunkWitness) -> Result<(), String> {
+    let anchored = witness.fork_name >= ForkName::Tsuki;
+    match (&witness.parent_header, anchored) {
+        (None, true) => Err(format!(
+            "missing parent header for a {} chunk",
+            witness.fork_name
+        )),
+        (Some(_), false) => Err(format!(
+            "parent header supplied for a {} chunk, which is not anchored to one",
+            witness.fork_name
+        )),
+        _ => Ok(()),
+    }
+}
+
 fn check_validium_inputs(witness: &ChunkWitness) -> Result<(), String> {
     let version = Version::from(witness.version);
     match &witness.validium {

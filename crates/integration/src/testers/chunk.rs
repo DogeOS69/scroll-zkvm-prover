@@ -3,6 +3,7 @@ use crate::{
     testdata_fork_directory, tester_execute, testers::PATH_TESTDATA, testing_hardfork,
     testing_version, utils::metadata_from_chunk_witnesses,
 };
+use eyre::{Context, ContextCompat};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sbv_core::BlockWitness;
 use sbv_primitives::{
@@ -112,19 +113,45 @@ fn initial_prev_message_hash(version: Version) -> B256 {
 ///
 /// It is the witness of the preceding block when the corpus has one, and otherwise the header in
 /// `<witnesses_dir>/parent.json`, which is how a corpus that starts at the chain's first block
-/// carries its genesis header. A corpus with neither returns `None`, which only the forks before
-/// Tsuki accept.
-pub fn read_parent_header(witnesses_dir: &Path, first_block: u64) -> eyre::Result<Option<Header>> {
-    if let Some(previous) = first_block.checked_sub(1) {
-        let path = witnesses_dir.join(format!("{previous}.json"));
-        if path.exists() {
+/// carries its genesis header. Note that the two are written differently: a witness carries its
+/// header in the struct's own field names, while `parent.json` is an RPC block object.
+///
+/// A fork that anchors its chunks cannot proceed without one, so a corpus with neither is a
+/// harness misconfiguration and is reported here, naming both paths that were probed, rather than
+/// surfacing three layers later as a chunk that blames its own witness.
+pub fn read_parent_header(
+    witnesses_dir: &Path,
+    first_block: u64,
+    fork: ForkName,
+) -> eyre::Result<Option<Header>> {
+    let previous = first_block
+        .checked_sub(1)
+        .map(|previous| witnesses_dir.join(format!("{previous}.json")));
+    if let Some(path) = &previous {
+        if path
+            .try_exists()
+            .with_context(|| path.display().to_string())?
+        {
             return Ok(Some(read_block_witness(path)?.header));
         }
     }
-    let path = witnesses_dir.join("parent.json");
-    if path.exists() {
-        return Ok(Some(read_json(path)?));
+    let genesis = witnesses_dir.join("parent.json");
+    if genesis
+        .try_exists()
+        .with_context(|| genesis.display().to_string())?
+    {
+        return Ok(Some(read_json(&genesis)?));
     }
+    eyre::ensure!(
+        fork < ForkName::Tsuki,
+        "a {fork} chunk starting at block {first_block} needs the header of the block before it, \
+         and the corpus carries neither {} nor {}",
+        previous.as_ref().map_or_else(
+            || "a preceding witness".to_string(),
+            |path| path.display().to_string()
+        ),
+        genesis.display(),
+    );
     Ok(None)
 }
 
@@ -171,12 +198,14 @@ impl ChunkTaskGenerator {
             .map(read_block_witness)
             .collect::<eyre::Result<Vec<BlockWitness>>>()?;
 
+        let first_block = *self
+            .block_range
+            .first()
+            .wrap_err("a chunk task needs at least one block")?;
         let parent_header = read_parent_header(
             &Path::new(PATH_TESTDATA).join(dir_name).join("witnesses"),
-            block_witnesses
-                .first()
-                .map(|witness| witness.header.number)
-                .unwrap_or_default(),
+            first_block,
+            self.version.fork,
         )?;
 
         let witness = if self.version.is_validium() {
@@ -226,16 +255,20 @@ pub fn get_witness_from_env_or_builder(
         .iter()
         .map(read_block_witness)
         .collect::<eyre::Result<Vec<BlockWitness>>>()?;
+    let first = block_witnesses
+        .first()
+        .wrap_err("TRACE_PATH matched no witnesses")?;
 
     let version = testing_version().as_version_byte();
+    // The parent comes from the directory the witnesses themselves came from, not from the fork's
+    // testdata: a TRACE_PATH run is pointed at some other corpus, whose parent is not the
+    // fixtures'.
     let parent_header = read_parent_header(
-        &Path::new(PATH_TESTDATA)
-            .join(effective_testdata_fork_directory(testing_hardfork()))
-            .join("witnesses"),
-        block_witnesses
-            .first()
-            .map(|witness| witness.header.number)
-            .unwrap_or_default(),
+        paths[0]
+            .parent()
+            .wrap_err("TRACE_PATH witnesses need a directory")?,
+        first.header.number,
+        testing_hardfork(),
     )?;
 
     Ok(ChunkWitness::new_scroll(
@@ -255,7 +288,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
-        ForkName::Tsuki => (Version::tsuki(), 1..=26),
+        ForkName::Tsuki => (Version::tsuki(), 1..=7),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -311,8 +344,11 @@ pub fn create_canonical_tasks(
     Ok(ret)
 }
 
-fn tsuki_golden_chunk_ranges() -> [std::ops::RangeInclusive<u64>; 4] {
-    [1..=8, 9..=16, 17..=20, 21..=26]
+/// The `tsuki-base-fee` corpus split into two chunks, at the block whose transaction changes the
+/// L2 base-fee overhead: the second chunk is then the first one that has to read the new value out
+/// of its own pre-state, and its trusted parent is the boundary block.
+fn tsuki_golden_chunk_ranges() -> [std::ops::RangeInclusive<u64>; 2] {
+    [1..=4, 5..=7]
 }
 
 pub fn tsuki_golden_chunk_tasks() -> eyre::Result<Vec<ChunkTaskGenerator>> {

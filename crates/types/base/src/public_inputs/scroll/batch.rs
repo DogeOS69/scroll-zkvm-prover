@@ -8,11 +8,17 @@ use crate::{
 /// Represents public-input values for a batch.
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct BatchInfo {
-    /// The state root before applying the batch.
+    /// The batch's previous endpoint: the first chunk's, taken straight from it.
+    ///
+    /// From Tsuki that is the **L2 block hash** of the block before the batch's first block, not a
+    /// state root; see [`ChunkInfo::prev_state_root`][crate::public_inputs::scroll::chunk::ChunkInfo::prev_state_root].
+    /// The field name and the byte layout are unchanged.
     pub parent_state_root: B256,
     /// The batch hash of the parent batch.
     pub parent_batch_hash: B256,
-    /// The state root after applying txs in the batch.
+    /// The batch's final endpoint: the last chunk's, taken straight from it.
+    ///
+    /// From Tsuki that is the **L2 block hash** of the batch's last block, not a state root.
     pub state_root: B256,
     /// The batch header hash of the batch.
     pub batch_hash: B256,

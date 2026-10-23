@@ -65,9 +65,11 @@ pub struct ChunkInfo {
     /// The chunk's previous endpoint.
     ///
     /// From Tsuki this is the **L2 block hash** of the block before the chunk's first block,
-    /// which is the header the chunk opens; the field name is kept so the public-input layout and
-    /// the persisted protocol state are unchanged. Earlier forks carry the state root before the
-    /// chunk, as the name says.
+    /// which is the header the chunk opens. The field name is kept so that the public-input byte
+    /// layout and the serde keys are unchanged and nothing has to be migrated; the *meaning* of
+    /// the published value does change, and it propagates - the batch and the bundle take their
+    /// own endpoints from these fields. Earlier forks carry the state root before the chunk, as
+    /// the name says.
     pub prev_state_root: B256,
     /// The chunk's final endpoint.
     ///
@@ -254,8 +256,8 @@ impl ChunkInfo {
     /// concat(
     ///     version ||
     ///     chain id ||
-    ///     prev state root ||
-    ///     post state root ||
+    ///     prev endpoint ||
+    ///     post endpoint ||
     ///     withdraw root ||
     ///     next message index ||
     ///     tx data digest ||
@@ -356,10 +358,13 @@ impl MultiVersionPublicInputs for ChunkInfo {
     /// Validate public inputs between 2 contiguous chunks.
     ///
     /// - chain id MUST match
-    /// - state roots MUST be chained
+    /// - the boundary endpoints MUST be chained: state roots before Tsuki, and from Tsuki the
+    ///   block hashes those slots then carry, which is strictly stronger - a block hash commits
+    ///   to the state root and to every other header field
     /// - L1 msg queue hash MUST be chained
     ///
-    /// Furthermore, for validiums we must also chain the blockhashes.
+    /// Furthermore, for validiums we must also chain the blockhashes; from Tsuki the endpoint
+    /// check above already does that for the Scroll domain.
     fn validate(&self, prev_pi: &Self, version: Version) {
         assert_eq!(self.chain_id, prev_pi.chain_id);
         assert_eq!(self.prev_state_root, prev_pi.post_state_root);

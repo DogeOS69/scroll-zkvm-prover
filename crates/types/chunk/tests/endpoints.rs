@@ -2,17 +2,21 @@
 //! `post_state_root` slots. From Tsuki those slots carry the boundary **L2 block hashes** instead
 //! of state roots: the chunk opens the header of the block before its first block, so the hash of
 //! that header is the previous endpoint and the hash of its own last block is the final one. The
-//! byte layout does not change, which is what keeps the batch and bundle circuits and the
-//! persisted protocol state untouched.
+//! The byte layout does not change, which is what keeps the batch and bundle circuits untouched
+//! and means nothing has to be migrated. What the published value *means* does change, and it
+//! propagates: the batch and the bundle take their own endpoints from the chunk's, so the value a
+//! bundle proof finalizes on-chain is a block hash from Tsuki.
 
 mod common;
 
 use common::{TSUKI_VERSION_BYTE, base_fee_chunk, feynman_blocks};
 use sbv_core::BlockWitness;
+use sbv_primitives::types::consensus::BlockHeader as _;
 use sbv_primitives::{B256, U256, types::Header};
 use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
 use types_base::{
     fork_name::ForkName,
+    public_inputs::MultiVersionPublicInputs,
     public_inputs::scroll::chunk::{BlockContextV2, ChunkInfo, SIZE_BLOCK_CTX},
     version::Version,
 };
@@ -150,17 +154,137 @@ fn the_first_tsuki_chunk_opens_the_genesis_header() {
     assert_eq!(chunk_info.initial_block_number, 1);
 }
 
-/// A Tsuki chunk opened with a header that is not the one its first block names is not that
-/// chain's chunk, whatever else is consistent about it.
+/// The chunk's claimed pre-state root has to be the trusted parent's state root. Mutating the
+/// witness rather than the parent is what reaches this rule: changing the parent would change its
+/// hash, and the chunk would be rejected for not continuing from it instead (which
+/// `a_substituted_parent_header_is_rejected` covers).
 #[test]
-fn a_substituted_genesis_header_is_rejected() {
-    let (mut genesis, blocks) = base_fee_chunk();
-    genesis.state_root = B256::repeat_byte(9);
+fn a_pre_state_root_that_is_not_the_parents_is_rejected() {
+    let (genesis, mut blocks) = base_fee_chunk();
+    blocks[0].prev_state_root = B256::repeat_byte(9);
 
     let error = execute(tsuki_witness(genesis, &blocks))
-        .expect_err("the genesis header must be the one the chain starts from");
+        .expect_err("the chunk must start from the state the parent committed to");
     assert!(
-        error.starts_with("verify error: parent header mismatch:"),
+        error.starts_with("verify error: parent state root mismatch:"),
         "{error}"
     );
+}
+
+/// Two chunks that really do follow each other satisfy the contract the batch circuit enforces:
+/// `ChunkInfo::validate` chains the endpoints and the rolling message queue hash. Under Tsuki the
+/// endpoint half of that is strictly stronger than it was, because a block hash commits to the
+/// state root and to everything else in the header.
+#[test]
+fn a_chained_tsuki_pair_validates() {
+    let (genesis, blocks) = base_fee_chunk();
+    let boundary = &blocks[3];
+
+    let first = execute(tsuki_witness(genesis, &blocks[..4])).expect("the first chunk");
+    // The successor's rolling message queue hash is the one its predecessor ended on; block 3
+    // carries an L1 message, so this is not zero and the pair would not chain without it.
+    let second = ChunkWitness::new_scroll(
+        TSUKI_VERSION_BYTE,
+        &blocks[4..],
+        first.post_msg_queue_hash,
+        ForkName::Tsuki,
+        Some(boundary.header.clone()),
+    );
+    let second = execute(second).expect("the second chunk");
+
+    assert_ne!(
+        first.post_msg_queue_hash,
+        B256::ZERO,
+        "block 3 enqueues one"
+    );
+    second.validate(&first, Version::tsuki());
+}
+
+/// The two values a batch publishes as its own endpoints are the first chunk's previous endpoint
+/// and the last chunk's final one: `BatchInfoBuilderV7::build` copies them straight across
+/// (`crates/types/batch/src/builder/v7.rs`, `parent_state_root: first_chunk.prev_state_root` and
+/// `state_root: last_chunk.post_state_root`), and the bundle takes the batch's. So under Tsuki a
+/// batch - and the value a bundle proof finalizes on-chain - publishes block hashes.
+///
+/// This pins the two values that get copied, over the two chunks a batch of this corpus would
+/// span. Driving `BatchInfoBuilderV7` itself needs the blob bytes and the KZG point-evaluation
+/// witness that go with them, which only the integration harness builds, and its test binaries do
+/// not link (see the PR body); this is the part reachable from a crate that does.
+#[test]
+fn the_endpoints_a_batch_would_publish_are_block_hashes() {
+    let (genesis, blocks) = base_fee_chunk();
+    let boundary = &blocks[3];
+
+    let first = execute(tsuki_witness(genesis.clone(), &blocks[..4])).expect("the first chunk");
+    let last = execute(ChunkWitness::new_scroll(
+        TSUKI_VERSION_BYTE,
+        &blocks[4..],
+        first.post_msg_queue_hash,
+        ForkName::Tsuki,
+        Some(boundary.header.clone()),
+    ))
+    .expect("the last chunk");
+
+    // What the batch builder would copy into `BatchInfo::parent_state_root` / `state_root`.
+    assert_eq!(first.prev_state_root, genesis.hash_slow());
+    assert_eq!(
+        last.post_state_root,
+        blocks.last().unwrap().header.hash_slow()
+    );
+    // Neither is a state root any more, which is the whole point.
+    assert_ne!(first.prev_state_root, genesis.state_root);
+    assert_ne!(
+        last.post_state_root,
+        blocks.last().unwrap().header.state_root
+    );
+}
+
+/// The one new wire field has to survive the encoding the guest decodes, in both states, and the
+/// decoded witness has to execute to the same public inputs as the one that was encoded.
+#[rstest::rstest]
+#[case::anchored(true)]
+#[case::unanchored(false)]
+fn the_witness_round_trips_through_bincode_and_json(#[case] anchored: bool) {
+    let (genesis, blocks) = base_fee_chunk();
+    let witness = if anchored {
+        tsuki_witness(genesis, &blocks)
+    } else {
+        // An unanchored witness is an earlier fork's, so use that fork's version too.
+        ChunkWitness::new_scroll(
+            Version::feynman().as_version_byte(),
+            &blocks,
+            B256::ZERO,
+            ForkName::Feynman,
+            None,
+        )
+    };
+    let expected = witness.parent_header.as_ref().map(Header::hash_slow);
+
+    let config = bincode::config::standard();
+    let bytes = bincode::serde::encode_to_vec(&witness, config).expect("encode");
+    let (decoded, _): (ChunkWitness, usize) =
+        bincode::serde::decode_from_slice(&bytes, config).expect("decode");
+    assert_eq!(
+        decoded.parent_header.as_ref().map(Header::hash_slow),
+        expected
+    );
+
+    let json = serde_json::to_string(&witness).expect("to json");
+    let from_json: ChunkWitness = serde_json::from_str(&json).expect("from json");
+    assert_eq!(
+        from_json.parent_header.as_ref().map(Header::hash_slow),
+        expected
+    );
+
+    // The decoded witness has to be the same chunk, not merely the same bytes.
+    if anchored {
+        assert_eq!(
+            execute(decoded)
+                .expect("the decoded chunk")
+                .pi_hash_by_version(Version::tsuki()),
+            execute(witness)
+                .expect("the encoded chunk")
+                .pi_hash_by_version(Version::tsuki())
+        );
+    }
 }

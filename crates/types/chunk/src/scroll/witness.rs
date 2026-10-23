@@ -29,7 +29,13 @@ pub struct ChunkWitness {
     /// Its hash is the chunk's previous proof endpoint and its state root is the state the chunk
     /// starts from, so from Tsuki onwards it is what anchors the chunk to the chain. Earlier
     /// forks keep their historical behaviour and leave it absent.
-    #[serde(default)]
+    ///
+    /// Adding this field is a **breaking wire change**, and the `Option` does not soften it:
+    /// bincode encodes a struct as a fixed-length tuple, so a witness written before this field
+    /// existed fails to decode rather than arriving with `None`. A producer outside this repo -
+    /// `ProvingTask::serialized_witness` is opaque bytes - has to be bumped in lockstep, which is
+    /// also what the pinned program commitments enforce. The `Option` is here because the field is
+    /// genuinely absent before Tsuki, not for compatibility.
     #[serde_as(as = "Option<sbv_primitives::types::consensus::serde_bincode_compat::Header>")]
     pub parent_header: Option<Header>,
 }

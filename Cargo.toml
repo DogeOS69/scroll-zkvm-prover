@@ -110,6 +110,7 @@ metrics-tracing-context = "0.16.0"
 rayon = "1.10"
 revm = "=36.0.0"
 serde = { version = "1", default-features = false, features = ["derive"] }
+rstest = "0.26"
 serde_json = { version = "1.0" }
 serde_with = "3.11.0"
 base64 = "0.22"

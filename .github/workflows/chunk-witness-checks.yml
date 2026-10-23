@@ -10,6 +10,7 @@ on:
       - Makefile
       - crates/types/**/*
       - crates/integration/testdata/tsuki/**/*
+      - crates/integration/testdata/tsuki-base-fee/**/*
   push:
     branches:
       - master
@@ -23,6 +24,7 @@ on:
       - Makefile
       - crates/types/**/*
       - crates/integration/testdata/tsuki/**/*
+      - crates/integration/testdata/tsuki-base-fee/**/*
   workflow_dispatch:
 
 concurrency:
