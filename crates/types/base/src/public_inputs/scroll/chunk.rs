@@ -62,9 +62,19 @@ impl BlockContextV2 {
 pub struct ChunkInfo {
     /// The EIP-155 chain ID for all txs in the chunk.
     pub chain_id: u64,
-    /// The state root before applying the chunk.
+    /// The chunk's previous endpoint.
+    ///
+    /// From Tsuki this is the **L2 block hash** of the block before the chunk's first block,
+    /// which is the header the chunk opens. The field name is kept so that the public-input byte
+    /// layout and the serde keys are unchanged and nothing has to be migrated; the *meaning* of
+    /// the published value does change, and it propagates - the batch and the bundle take their
+    /// own endpoints from these fields. Earlier forks carry the state root before the chunk, as
+    /// the name says.
     pub prev_state_root: B256,
-    /// The state root after applying the chunk.
+    /// The chunk's final endpoint.
+    ///
+    /// From Tsuki this is the **L2 block hash** of the chunk's last block, for the same reason as
+    /// [`Self::prev_state_root`]. Earlier forks carry the state root after the chunk.
     pub post_state_root: B256,
     /// The withdrawals root after applying the chunk.
     pub withdraw_root: B256,
@@ -246,8 +256,8 @@ impl ChunkInfo {
     /// concat(
     ///     version ||
     ///     chain id ||
-    ///     prev state root ||
-    ///     post state root ||
+    ///     prev endpoint ||
+    ///     post endpoint ||
     ///     withdraw root ||
     ///     next message index ||
     ///     tx data digest ||
@@ -348,10 +358,13 @@ impl MultiVersionPublicInputs for ChunkInfo {
     /// Validate public inputs between 2 contiguous chunks.
     ///
     /// - chain id MUST match
-    /// - state roots MUST be chained
+    /// - the boundary endpoints MUST be chained: state roots before Tsuki, and from Tsuki the
+    ///   block hashes those slots then carry, which is strictly stronger - a block hash commits
+    ///   to the state root and to every other header field
     /// - L1 msg queue hash MUST be chained
     ///
-    /// Furthermore, for validiums we must also chain the blockhashes.
+    /// Furthermore, for validiums we must also chain the blockhashes; from Tsuki the endpoint
+    /// check above already does that for the Scroll domain.
     fn validate(&self, prev_pi: &Self, version: Version) {
         assert_eq!(self.chain_id, prev_pi.chain_id);
         assert_eq!(self.prev_state_root, prev_pi.post_state_root);

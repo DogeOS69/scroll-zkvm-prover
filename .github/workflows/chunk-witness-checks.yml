@@ -9,7 +9,12 @@ on:
       - rust-toolchain.toml
       - Makefile
       - crates/types/**/*
+      - crates/integration/Cargo.toml
+      - crates/integration/src/**/*
+      - crates/integration/tests/**/*
       - crates/integration/testdata/tsuki/**/*
+      - crates/integration/testdata/tsuki-base-fee/**/*
+      - crates/integration/testdata/validium/**/*
   push:
     branches:
       - master
@@ -22,7 +27,12 @@ on:
       - rust-toolchain.toml
       - Makefile
       - crates/types/**/*
+      - crates/integration/Cargo.toml
+      - crates/integration/src/**/*
+      - crates/integration/tests/**/*
       - crates/integration/testdata/tsuki/**/*
+      - crates/integration/testdata/tsuki-base-fee/**/*
+      - crates/integration/testdata/validium/**/*
   workflow_dispatch:
 
 concurrency:
@@ -48,3 +58,9 @@ jobs:
 
       - name: Run chunk witness checks
         run: make test-chunk-witness-checks
+
+      - name: Run batch codec checks
+        run: make test-batch-codec
+
+      - name: Run parent header caller checks
+        run: make test-parent-header-callers

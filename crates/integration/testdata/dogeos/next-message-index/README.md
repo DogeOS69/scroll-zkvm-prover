@@ -19,13 +19,18 @@ production fork; `ForkName::Tsuki` / `Version::tsuki()` are introduced by PR #9
 ## What the test asserts
 
 `crates/integration/tests/dogeos_next_message_index.rs` reads the block witnesses,
-assembles a `ChunkWitness` for Tsuki (`ChunkWitness::new_scroll(..., ForkName::Tsuki)`),
+assembles a `ChunkWitness` for Tsuki (`ChunkWitness::new_scroll(..., ForkName::Tsuki, parent_header)`),
 derives a `ChunkInfo` natively via `metadata_from_chunk_witnesses` (runs the SBV
 state-transition — **no guest program, no GPU**), and asserts:
 
 - `chunk_info.chain_id == 6281971` (DogeOS Tsuki-era L2),
 - block range `11..=13`,
 - `chunk_info.next_message_index == expected_next_message_index` from the manifest.
+
+The current caller requires block 10's native header, loaded from `witnesses/10.json`,
+`witnesses/11.parent.json`, or `witnesses/parent.json`. This historical fixture remains
+ignored until regenerated with the current pinned SBV witness format, slot-101 proofs,
+Tsuki fee parameters, and that preceding header.
 
 These blocks contain **no L1 messages**, so `next_message_index` stays `0`. This
 is the cheap, non-advancing base case: it proves the field is threaded and

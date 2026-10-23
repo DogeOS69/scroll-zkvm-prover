@@ -258,8 +258,17 @@ impl TaskProver for Prover {
 }
 
 /// Testdata fixture directory for a fork.
+///
+/// Tsuki reads `tsuki-base-fee` rather than `tsuki`: from Tsuki a chunk is anchored to the header
+/// of the block before it and every block's base fee has to follow the protocol rule, and only a
+/// corpus produced by a node that enforces the rule, and that carries its chain's genesis header,
+/// can satisfy either. The 26-block `tsuki` corpus predates both; see
+/// `testdata/tsuki-base-fee/README.md`.
 pub fn effective_testdata_fork_directory(fork: ForkName) -> &'static str {
-    fork.as_str()
+    match fork {
+        ForkName::Tsuki => "tsuki-base-fee",
+        other => other.as_str(),
+    }
 }
 
 /// Enviroment settings for test: fork dir

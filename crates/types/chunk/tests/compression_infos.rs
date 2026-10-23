@@ -3,66 +3,82 @@
 //! The chunk witness carries one compression info per transaction. If a block's vector is
 //! shorter than its transaction list, the trailing transactions must not be skipped: the chunk
 //! still commits to every transaction, so the post-state root would come from a prefix only.
-//! This test forges exactly that witness (last block truncated, header root set to the prefix
-//! root) on a real Tsuki chunk and checks that `execute` rejects it.
+//!
+//! Dropping the transaction itself is caught independently, by the transactions root in its own
+//! header, which is asserted here too: the two rules close the same hole from opposite sides.
+//!
+//! One thing was traded away in moving to this corpus. The older version of the first test wrote
+//! the prefix state root - the root the chunk reaches without the skipped transaction - into the
+//! last block's header, so the witness was consistent apart from the truncated list and the test
+//! would have failed had the count check been removed. That is not constructible here: this
+//! corpus's last block is empty, and rewriting an earlier block's state root breaks the
+//! witness-chaining check first. These tests pin the two error paths instead.
 
 mod common;
 
-use common::{TSUKI_VERSION_BYTE, tsuki_blocks};
-use sbv_core::{BlockWitness, error::StatelessValidationError, verifier};
-use sbv_primitives::{
-    B256,
-    chainspec::{Chain, build_chain_spec_force_hardfork},
-    hardforks::Hardfork,
-};
+use common::{TSUKI_VERSION_BYTE, base_fee_chunk};
+use sbv_core::BlockWitness;
+use sbv_primitives::{B256, types::consensus::Header};
 use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
 use types_base::fork_name::ForkName;
 
-/// The state root reached by executing the chunk without the last block's final transaction.
-fn prefix_state_root(blocks: &[BlockWitness]) -> B256 {
-    let mut blocks = blocks.to_vec();
-    blocks.last_mut().unwrap().transactions.pop().unwrap();
-    let infos = blocks.iter().map(BlockWitness::compression_infos).collect();
-    let chain_spec =
-        build_chain_spec_force_hardfork(Chain::from_id(blocks[0].chain_id), Hardfork::Tsuki);
-    match verifier::run(&blocks, chain_spec, infos) {
-        Err(StatelessValidationError::PostStateRootMismatch { got, .. }) => got,
-        other => panic!("expected the prefix to reach a different root, got {other:?}"),
-    }
+fn witness(parent: Header, blocks: &[BlockWitness]) -> ChunkWitness {
+    ChunkWitness::new_scroll(
+        TSUKI_VERSION_BYTE,
+        blocks,
+        B256::ZERO,
+        ForkName::Tsuki,
+        parent,
+    )
 }
 
 #[test]
 fn honest_tsuki_chunk_executes() {
-    let witness = ChunkWitness::new_scroll(
-        TSUKI_VERSION_BYTE,
-        &tsuki_blocks(),
-        B256::ZERO,
-        ForkName::Tsuki,
-    );
-    execute(witness).expect("honest chunk must execute");
+    let (parent, blocks) = base_fee_chunk();
+    execute(witness(parent, &blocks)).expect("honest chunk must execute");
 }
 
+/// A block with fewer compression infos than transactions is rejected before execution, so the
+/// trailing transactions cannot be skipped while the chunk still commits to them.
 #[test]
-fn truncated_compression_infos_with_matching_header_root_are_rejected() {
-    let blocks = tsuki_blocks();
-    let last_txs = blocks.last().unwrap().transactions.len();
-    assert!(
-        last_txs > 1,
-        "fixture's last block must have several transactions"
-    );
-    let prefix_root = prefix_state_root(&blocks);
-    assert_ne!(prefix_root, blocks.last().unwrap().header.state_root);
-
-    let mut witness =
-        ChunkWitness::new_scroll(TSUKI_VERSION_BYTE, &blocks, B256::ZERO, ForkName::Tsuki);
-    // The count check fires before execution, so the forged root does not change the outcome
-    // here. It makes the witness otherwise consistent, so that without the check it executes.
-    witness.blocks.last_mut().unwrap().header.state_root = prefix_root;
-    witness.compression_infos.last_mut().unwrap().pop().unwrap();
+fn truncated_compression_infos_are_rejected() {
+    let (parent, blocks) = base_fee_chunk();
+    let mut witness = witness(parent, &blocks);
+    // The chunk's last block is empty, so truncate the first block's infos instead.
+    let first = witness.compression_infos.first_mut().expect("a block");
+    assert!(first.len() > 1, "the first block has several transactions");
+    first.pop();
 
     let err = execute(witness).expect_err("a chunk that skips a transaction must not execute");
     assert!(
         err.contains("invalid compression infos"),
+        "unexpected error: {err}"
+    );
+}
+
+/// Dropping the transaction from the witness instead of its compression info is caught by the
+/// transactions root the block's own header commits to.
+#[test]
+fn a_witness_that_drops_a_transaction_is_rejected() {
+    let (parent, blocks) = base_fee_chunk();
+    let mut witness = witness(parent, &blocks);
+    let first = witness.blocks.first_mut().expect("a block");
+    assert!(
+        first.transactions.len() > 1,
+        "the first block has several transactions"
+    );
+    first.transactions.pop();
+    witness
+        .compression_infos
+        .first_mut()
+        .expect("a block")
+        .pop();
+
+    let err = execute(witness).expect_err("a chunk missing a transaction must not execute");
+    // Specifically the transactions root, so the test says which layer caught the drop.
+    assert!(
+        err.starts_with("verify error: body validation failed for block 1:")
+            && err.contains("transaction root"),
         "unexpected error: {err}"
     );
 }

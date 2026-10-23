@@ -8,4 +8,4 @@ mod execute;
 pub use execute::execute;
 
 mod witness;
-pub use witness::{ChunkWitness, ValidiumInputs};
+pub use witness::{ChunkWitness, ValidiumInputs, fork_is_anchored};

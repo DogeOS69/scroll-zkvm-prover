@@ -16,14 +16,20 @@ pub struct BundleInfo {
     pub msg_queue_hash: B256,
     /// The number of batches bundled together in the bundle.
     pub num_batches: u32,
-    /// The last finalized on-chain state root.
+    /// The last finalized on-chain endpoint.
+    ///
+    /// From Tsuki this is an **L2 block hash** rather than a state root: it is the first batch's
+    /// previous endpoint, which comes from its first chunk's. The field name and the byte layout
+    /// are unchanged.
     pub prev_state_root: B256,
     /// The last finalized on-chain batch hash.
     pub prev_batch_hash: B256,
-    /// The state root after applying every batch in the bundle.
+    /// The bundle's final endpoint, after applying every batch in it.
     ///
-    /// Upon verification of the EVM-verifiable bundle proof, this state root will be finalized
-    /// on-chain.
+    /// Upon verification of the EVM-verifiable bundle proof, this value is finalized on-chain.
+    /// From Tsuki it is the **L2 block hash** of the bundle's last block rather than a state root,
+    /// so what is finalized commits to the whole header; the field name and the byte layout are
+    /// unchanged.
     pub post_state_root: B256,
     /// The batch hash of the last batch in the bundle.
     ///

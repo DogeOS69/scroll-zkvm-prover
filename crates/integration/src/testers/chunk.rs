@@ -3,9 +3,13 @@ use crate::{
     testdata_fork_directory, tester_execute, testers::PATH_TESTDATA, testing_hardfork,
     testing_version, utils::metadata_from_chunk_witnesses,
 };
+use eyre::{Context, ContextCompat};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sbv_core::BlockWitness;
-use sbv_primitives::{B256, types::consensus::TxL1Message};
+use sbv_primitives::{
+    B256,
+    types::{Header, consensus::TxL1Message},
+};
 use scroll_zkvm_prover::utils::read_json;
 use scroll_zkvm_prover::utils::vm::ExecutionResult;
 use scroll_zkvm_types::{
@@ -29,24 +33,22 @@ pub fn read_block_witness_from_testdata(block_n: usize) -> eyre::Result<BlockWit
 }
 
 /// Utility function to read and deserialize block witness given the block number.
+///
+/// Accepts the native SBV format. Legacy corpora must be regenerated with a current node.
 pub fn read_block_witness<P>(path_witness: P) -> eyre::Result<BlockWitness>
 where
     P: AsRef<Path>,
 {
-    if !path_witness.as_ref().exists() {
-        println!("File not found: {:?}", path_witness.as_ref());
-        return Err(eyre::eyre!("File not found: {:?}", path_witness.as_ref()));
+    let path = path_witness.as_ref();
+    if !path
+        .try_exists()
+        .with_context(|| path.display().to_string())?
+    {
+        return Err(eyre::eyre!("File not found: {}", path.display()));
     }
 
-    if let Ok(ret) = serde_json::from_reader::<_, BlockWitness>(File::open(&path_witness)?) {
-        Ok(ret)
-    } else {
-        let witness = File::open(path_witness)?;
-        Ok(BlockWitness::from(serde_json::from_reader::<
-            _,
-            sbv_primitives::legacy_types::BlockWitness,
-        >(witness)?))
-    }
+    serde_json::from_reader(File::open(path)?)
+        .with_context(|| format!("{}: expected a native SBV block witness", path.display()))
 }
 
 pub struct ChunkProverTester;
@@ -105,6 +107,57 @@ fn initial_prev_message_hash(version: Version) -> B256 {
     }
 }
 
+/// Load the header of the block before a chunk's first block. SBV validates its hash at execution.
+///
+/// Prefer the preceding block's native witness, then `<first_block>.parent.json` for sparse
+/// corpora, then `parent.json` for the start of a contiguous corpus (including genesis).
+/// Header files are RPC block objects; native witnesses use their own header field names.
+///
+/// Every supported fork needs a parent for SBV validation. A corpus with no parent is reported
+/// here, naming all paths that were probed. Successful reads always return a concrete header.
+pub fn read_parent_header(
+    witnesses_dir: &Path,
+    first_block: u64,
+    fork: ForkName,
+) -> eyre::Result<Header> {
+    let parent_number = first_block
+        .checked_sub(1)
+        .wrap_err("a chunk cannot start at genesis: block 0 has no parent")?;
+    let previous = witnesses_dir.join(format!("{parent_number}.json"));
+    let per_block = witnesses_dir.join(format!("{first_block}.parent.json"));
+    let parent_file = witnesses_dir.join("parent.json");
+    let (header, source): (Header, _) = if previous
+        .try_exists()
+        .with_context(|| previous.display().to_string())?
+    {
+        (read_block_witness(&previous)?.header, previous)
+    } else if per_block
+        .try_exists()
+        .with_context(|| per_block.display().to_string())?
+    {
+        (read_json(&per_block)?, per_block)
+    } else if parent_file
+        .try_exists()
+        .with_context(|| parent_file.display().to_string())?
+    {
+        (read_json(&parent_file)?, parent_file)
+    } else {
+        eyre::bail!(
+            "a {fork} chunk starting at block {first_block} needs its parent header; missing {}, {} and {}",
+            previous.display(),
+            per_block.display(),
+            parent_file.display(),
+        );
+    };
+    eyre::ensure!(
+        header.number == parent_number,
+        "{} contains block {}, expected parent block {parent_number} for chunk starting at {first_block}",
+        source.display(),
+        header.number
+    );
+    Ok(header)
+}
+
 impl ChunkTaskGenerator {
     pub fn get_or_build_witness(&mut self) -> eyre::Result<ChunkWitness> {
         if let Some(witness) = &self.witness {
@@ -148,6 +201,16 @@ impl ChunkTaskGenerator {
             .map(read_block_witness)
             .collect::<eyre::Result<Vec<BlockWitness>>>()?;
 
+        let first_block = *self
+            .block_range
+            .first()
+            .wrap_err("a chunk task needs at least one block")?;
+        let parent_header = read_parent_header(
+            &Path::new(PATH_TESTDATA).join(dir_name).join("witnesses"),
+            first_block,
+            self.version.fork,
+        )?;
+
         let witness = if self.version.is_validium() {
             let base_dir = Path::new(PATH_TESTDATA).join("validium").join("witnesses");
             let secret_key = hex::decode(std::env::var("VALIDIUM_KEY")?)?;
@@ -165,6 +228,7 @@ impl ChunkTaskGenerator {
                 self.version.fork,
                 validium_txs,
                 secret_key,
+                parent_header,
             )
         } else {
             ChunkWitness::new_scroll(
@@ -173,6 +237,7 @@ impl ChunkTaskGenerator {
                 self.prev_message_hash
                     .unwrap_or_else(|| initial_prev_message_hash(self.version)),
                 self.version.fork,
+                parent_header,
             )
         };
 
@@ -185,22 +250,55 @@ pub fn get_witness_from_env_or_builder(
     fallback_generator: &mut ChunkTaskGenerator,
 ) -> eyre::Result<ChunkWitness> {
     let paths: Vec<PathBuf> = match std::env::var("TRACE_PATH") {
-        Ok(paths) => glob::glob(&paths)?.filter_map(|entry| entry.ok()).collect(),
+        // A glob entry that cannot be read is reported rather than dropped: silently skipping one
+        // turns a permissions problem into a chunk that is quietly missing a block.
+        Ok(paths) => glob::glob(&paths)?
+            .collect::<Result<Vec<_>, _>>()
+            .wrap_err("TRACE_PATH")?,
         Err(_) => return fallback_generator.get_or_build_witness(),
     };
 
-    let block_witnesses = paths
-        .iter()
-        .map(read_block_witness)
-        .collect::<eyre::Result<Vec<BlockWitness>>>()?;
+    read_scroll_chunk_from_paths(paths, testing_version())
+}
 
-    let version = testing_version().as_version_byte();
+fn read_scroll_chunk_from_paths(
+    paths: Vec<PathBuf>,
+    version: Version,
+) -> eyre::Result<ChunkWitness> {
+    let mut blocks = paths
+        .into_iter()
+        .filter(|path| {
+            !path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name == "parent.json" || name.ends_with(".parent.json"))
+        })
+        .map(|path| read_block_witness(&path).map(|block| (path, block)))
+        .collect::<eyre::Result<Vec<_>>>()?;
+    blocks.sort_by_key(|(_, block)| block.header.number);
+    let (first_path, first) = blocks.first().wrap_err("TRACE_PATH matched no witnesses")?;
+
+    // The parent comes from the directory the witnesses themselves came from, not from the fork's
+    // testdata: a TRACE_PATH run is pointed at some other corpus, whose parent is not the
+    // fixtures'.
+    let parent_header = read_parent_header(
+        first_path
+            .parent()
+            .wrap_err("TRACE_PATH witnesses need a directory")?,
+        first.header.number,
+        version.fork,
+    )?;
+    let block_witnesses = blocks
+        .into_iter()
+        .map(|(_, block)| block)
+        .collect::<Vec<_>>();
 
     Ok(ChunkWitness::new_scroll(
-        version,
+        version.as_version_byte(),
         &block_witnesses,
-        initial_prev_message_hash(testing_version()),
-        testing_hardfork(),
+        initial_prev_message_hash(version),
+        version.fork,
+        parent_header,
     ))
 }
 
@@ -212,7 +310,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
-        ForkName::Tsuki => (Version::tsuki(), 1..=26),
+        ForkName::Tsuki => (Version::tsuki(), 1..=7),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -268,8 +366,11 @@ pub fn create_canonical_tasks(
     Ok(ret)
 }
 
-fn tsuki_golden_chunk_ranges() -> [std::ops::RangeInclusive<u64>; 4] {
-    [1..=8, 9..=16, 17..=20, 21..=26]
+/// The `tsuki-base-fee` corpus split into two chunks, at the block whose transaction changes the
+/// L2 base-fee overhead: the second chunk is then the first one that has to read the new value out
+/// of its own pre-state, and its trusted parent is the boundary block.
+fn tsuki_golden_chunk_ranges() -> [std::ops::RangeInclusive<u64>; 2] {
+    [1..=4, 5..=7]
 }
 
 pub fn tsuki_golden_chunk_tasks() -> eyre::Result<Vec<ChunkTaskGenerator>> {
@@ -390,19 +491,23 @@ pub fn execute_multi(
 
 #[cfg(test)]
 mod tests {
+    use super::{PATH_TESTDATA, read_parent_header};
     use crate::testers::chunk::{preset_chunk, preset_chunk_multiple};
+    use scroll_zkvm_types::public_inputs::ForkName;
+    use std::path::Path;
 
     #[test]
     fn test_presets() {
         std::env::remove_var("BLOCK_RANGE");
 
+        // The Tsuki presets read `tsuki-base-fee`, whose seven blocks split at the one whose
+        // transaction changes the L2 base-fee overhead.
         let single = preset_chunk();
-        assert_eq!(single.block_range, (1u64..=26).collect::<Vec<u64>>(),);
+        assert_eq!(single.block_range, (1u64..=7).collect::<Vec<u64>>(),);
         let multiple = preset_chunk_multiple();
-        assert_eq!(multiple[0].block_range, (1..=8).collect::<Vec<u64>>(),);
-        assert_eq!(multiple[1].block_range, (9..=16).collect::<Vec<u64>>(),);
-        assert_eq!(multiple[2].block_range, (17..=20).collect::<Vec<u64>>(),);
-        assert_eq!(multiple[3].block_range, (21..=26).collect::<Vec<u64>>(),);
+        assert_eq!(multiple.len(), 2);
+        assert_eq!(multiple[0].block_range, (1..=4).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[1].block_range, (5..=7).collect::<Vec<u64>>(),);
 
         // After setting env var.
         std::env::set_var("BLOCK_RANGE", "123..=321");
@@ -416,5 +521,141 @@ mod tests {
         assert_eq!(multiple[1].block_range, (3u64..=4u64).collect::<Vec<u64>>());
         assert_eq!(multiple[2].block_range, (5u64..=6u64).collect::<Vec<u64>>());
         std::env::remove_var("BLOCK_RANGE");
+    }
+
+    /// Parent loading is independent of the public-input endpoint semantics.
+    #[test]
+    fn a_parent_header_is_read_for_every_supported_fork() {
+        let tsuki = Path::new(PATH_TESTDATA)
+            .join("tsuki-base-fee")
+            .join("witnesses");
+        let missing = Path::new(PATH_TESTDATA).join("feynman").join("witnesses");
+        for fork in [
+            ForkName::Feynman,
+            ForkName::Galileo,
+            ForkName::GalileoV2,
+            ForkName::Tsuki,
+        ] {
+            for first_block in [1, 2] {
+                let parent = read_parent_header(&tsuki, first_block, fork)
+                    .expect("genesis and preceding witnesses are available");
+                assert_eq!(parent.number, first_block - 1);
+            }
+            let error = read_parent_header(&missing, 16_525_000, fork)
+                .expect_err("every fork requires a parent")
+                .to_string();
+            assert!(error.contains("16524999.json"), "{error}");
+            assert!(error.contains("parent.json"), "{error}");
+        }
+    }
+
+    #[test]
+    fn sparse_validium_blocks_load_their_own_parent_headers() {
+        use super::read_block_witness;
+        use sbv_primitives::B256;
+        use scroll_zkvm_types::{
+            public_inputs::Version,
+            scroll::chunk::{ChunkWitness, SecretKey},
+        };
+
+        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let dir = tempfile::tempdir().unwrap();
+        for number in [2, 5] {
+            let parent = read_block_witness(source.join(format!("{}.json", number - 1)))
+                .unwrap()
+                .header;
+            // A sparse validium corpus contains a parent header, not a full preceding witness.
+            std::fs::write(
+                dir.path().join(format!("{number}.parent.json")),
+                serde_json::to_vec(&parent).unwrap(),
+            )
+            .unwrap();
+            let version = Version::validium_v1();
+            let loaded = read_parent_header(dir.path(), number, version.fork).unwrap();
+            let block = read_block_witness(source.join(format!("{number}.json"))).unwrap();
+            assert_eq!(loaded.hash_slow(), block.header.parent_hash);
+            let witness = ChunkWitness::new_validium(
+                version.as_version_byte(),
+                &[block],
+                B256::ZERO,
+                version.fork,
+                vec![vec![]],
+                SecretKey::try_from_bytes([1u8; 32]).unwrap(),
+                loaded,
+            );
+            assert_eq!(
+                witness.parent_header.unwrap().hash_slow(),
+                parent.hash_slow()
+            );
+        }
+    }
+
+    #[test]
+    fn parent_files_cannot_silently_select_the_wrong_height() {
+        use super::read_block_witness;
+        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let dir = tempfile::tempdir().unwrap();
+        let parent = read_block_witness(source.join("1.json")).unwrap().header;
+        std::fs::write(
+            dir.path().join("parent.json"),
+            serde_json::to_vec(&parent).unwrap(),
+        )
+        .unwrap();
+        let error = read_parent_header(dir.path(), 5, ForkName::Tsuki)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("expected parent block 4"), "{error}");
+        assert!(
+            read_parent_header(dir.path(), 0, ForkName::Tsuki)
+                .unwrap_err()
+                .to_string()
+                .contains("genesis")
+        );
+        // A present but malformed block-specific parent must not fall back to parent.json.
+        std::fs::write(dir.path().join("2.parent.json"), b"null").unwrap();
+        assert!(read_parent_header(dir.path(), 2, ForkName::Tsuki).is_err());
+    }
+
+    #[test]
+    fn trace_paths_load_the_first_blocks_parent_and_skip_header_files() {
+        use super::{read_block_witness, read_scroll_chunk_from_paths};
+        use scroll_zkvm_types::{public_inputs::Version, scroll::chunk::execute};
+        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["parent.json", "1.json", "2.json"] {
+            std::fs::copy(source.join(name), dir.path().join(name)).unwrap();
+        }
+        let first = read_block_witness(source.join("1.json")).unwrap();
+        std::fs::write(
+            dir.path().join("2.parent.json"),
+            serde_json::to_vec(&first.header).unwrap(),
+        )
+        .unwrap();
+        let witness = read_scroll_chunk_from_paths(
+            ["2.json", "parent.json", "2.parent.json", "1.json"]
+                .map(|name| dir.path().join(name))
+                .to_vec(),
+            Version::tsuki(),
+        )
+        .unwrap();
+        assert_eq!(
+            witness
+                .blocks
+                .iter()
+                .map(|b| b.header.number)
+                .collect::<Vec<_>>(),
+            [1, 2]
+        );
+        assert_eq!(
+            witness.parent_header.as_ref().unwrap().hash_slow(),
+            first.header.parent_hash
+        );
+        execute(witness).expect("the loaded parent and native witnesses must execute together");
+        assert!(
+            read_scroll_chunk_from_paths(vec![dir.path().join("parent.json")], Version::tsuki())
+                .unwrap_err()
+                .to_string()
+                .contains("matched no witnesses")
+        );
     }
 }

@@ -16,8 +16,7 @@ use scroll_zkvm_types::{
     types_agg::AggregationInput,
     utils::{keccak256, point_eval, serialize_vk},
 };
-use std::env;
-use vm_zstd::zstd_encode;
+use std::{env, io::Write};
 
 #[allow(dead_code)]
 fn final_l1_index(blk: &BlockWitness) -> u64 {
@@ -202,7 +201,10 @@ pub fn build_batch_witnesses(
     }
     payload.extend(chunk_tx_bytes);
     // compress ...
-    let compressed_payload = zstd_encode(&payload);
+    let mut encoder = encoder_standard::init_zstd_encoder(encoder_standard::N_BLOCK_SIZE_TARGET);
+    encoder.set_pledged_src_size(Some(payload.len() as u64))?;
+    encoder.write_all(&payload)?;
+    let compressed_payload = encoder.finish()?;
 
     // 5 bytes are utilised by version (1), compressed_len (3) and is_encoded (1).
     if compressed_payload.len() > N_BLOB_BYTES - 5 {
@@ -428,7 +430,8 @@ fn test_build_and_parse_batch_task() -> eyre::Result<()> {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003),
         ForkName::Galileo => (Version::galileo(), 20239156u64..=20239192),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240u64..=20239245),
-        ForkName::Tsuki => (Version::tsuki(), 1..=26),
+        // The whole `tsuki-base-fee` corpus as one chunk.
+        ForkName::Tsuki => (Version::tsuki(), 1..=7),
     };
     let witness = ChunkTaskGenerator {
         version,

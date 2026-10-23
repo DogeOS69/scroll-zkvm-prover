@@ -17,7 +17,7 @@
 use eyre::{Context, ContextCompat, Result};
 use sbv_primitives::B256;
 use scroll_zkvm_integration::testers::PATH_TESTDATA;
-use scroll_zkvm_integration::testers::chunk::read_block_witness;
+use scroll_zkvm_integration::testers::chunk::{read_block_witness, read_parent_header};
 use scroll_zkvm_integration::utils::metadata_from_chunk_witnesses;
 use scroll_zkvm_types::public_inputs::{ForkName, Version};
 use scroll_zkvm_types::scroll::chunk::ChunkWitness;
@@ -54,6 +54,9 @@ fn parse_b256(s: &str) -> Result<B256> {
 }
 
 #[test]
+/// This fixture predates L2SystemConfig slot-101 proofs and Tsuki fee parameters,
+/// and carries no header for the block preceding its first block.
+#[ignore = "fixture lacks slot-101 proofs, Tsuki fee parameters and the preceding block header"]
 fn dogeos_next_message_index_committed_fixture() -> Result<()> {
     let dir = feature_path();
 
@@ -96,11 +99,16 @@ fn dogeos_next_message_index_committed_fixture() -> Result<()> {
 
     // Assemble the chunk witness exactly as the tester harness does, then derive the
     // ChunkInfo natively (runs the SBV STF; no guest program / GPU involved).
+    // From Tsuki the chunk opens the header of the block before its first block. The fixture
+    // carries it as the preceding block's witness, or as `witnesses/parent.json` when the range
+    // starts at the chain's first block.
+    let parent_header = read_parent_header(&witnesses_dir, manifest.block_start, ForkName::Tsuki)?;
     let witness = ChunkWitness::new_scroll(
         version.as_version_byte(),
         &blocks,
         prev_msg_queue_hash,
         ForkName::Tsuki,
+        parent_header,
     );
     let chunk_info = metadata_from_chunk_witnesses(witness)?;
 
