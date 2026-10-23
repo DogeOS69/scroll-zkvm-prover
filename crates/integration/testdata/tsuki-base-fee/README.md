@@ -11,8 +11,7 @@ rule makes a chunk unprovable unless its witnesses resolve that slot.
 | 2 | past the 3M gas target, so the base fee rises for block 3 |
 | 3 | an L1 message |
 | 4 | the transaction that sets the L2 base-fee overhead at slot 101 |
-| 5–6 | the first blocks judged on the new overhead |
-| 7 | an empty block |
+| 5–7 | the blocks judged on the new overhead; 7 is empty |
 
 The L2SystemConfig contract is a genesis predeploy with its slot unset, so blocks 1–4 are judged
 on the default overhead and 5–7 on the configured one. `witnesses/parent.json` is the chain's

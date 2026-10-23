@@ -168,7 +168,7 @@ fn check_version_fork(witness: &ChunkWitness) -> Result<(), String> {
 /// would be supplied, accepted and then silently discarded - the same mistake
 /// [`check_validium_inputs`] refuses for the validium inputs.
 fn check_parent_header(witness: &ChunkWitness) -> Result<(), String> {
-    let anchored = witness.fork_name >= ForkName::Tsuki;
+    let anchored = super::fork_is_anchored(witness.fork_name);
     match (&witness.parent_header, anchored) {
         (None, true) => Err(format!(
             "missing parent header for a {} chunk",

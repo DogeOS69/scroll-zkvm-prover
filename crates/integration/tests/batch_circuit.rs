@@ -131,7 +131,9 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
                 20239244..=20239245,
             ],
         ),
-        ForkName::Tsuki => (Version::tsuki(), vec![1..=10, 11..=20, 21..=26]),
+        // A different partition of the same `tsuki-base-fee` blocks as `tsuki_golden_chunk_tasks`,
+        // which is the point: the blob encoding must not depend on where the chunk boundaries fall.
+        ForkName::Tsuki => (Version::tsuki(), vec![1..=2, 3..=5, 6..=7]),
     };
     let outcome_2 = create_canonical_tasks(version, block_range.into_iter())?;
 

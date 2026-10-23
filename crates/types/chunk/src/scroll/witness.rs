@@ -7,6 +7,16 @@ use std::collections::HashSet;
 use types_base::version::Version;
 use types_base::{fork_name::ForkName, public_inputs::scroll::chunk::ChunkInfo};
 
+/// Whether a chunk of this fork is anchored to the header of the block before its first block.
+///
+/// From Tsuki a chunk's previous endpoint is that header's hash, so the witness carries it and
+/// [`execute`][super::execute] requires it; the earlier forks have state-root endpoints and refuse
+/// one. Anything that assembles a witness asks here rather than keeping its own copy of the rule,
+/// which is how a harness and the chunk path can disagree.
+pub fn fork_is_anchored(fork: ForkName) -> bool {
+    fork >= ForkName::Tsuki
+}
+
 /// The witness type accepted by the chunk-circuit.
 #[serde_with::serde_as]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

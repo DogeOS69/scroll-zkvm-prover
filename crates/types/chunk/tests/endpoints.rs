@@ -1,7 +1,8 @@
 //! A chunk's public inputs carry its boundary endpoints in the `prev_state_root` and
 //! `post_state_root` slots. From Tsuki those slots carry the boundary **L2 block hashes** instead
 //! of state roots: the chunk opens the header of the block before its first block, so the hash of
-//! that header is the previous endpoint and the hash of its own last block is the final one. The
+//! that header is the previous endpoint and the hash of its own last block is the final one.
+//!
 //! The byte layout does not change, which is what keeps the batch and bundle circuits untouched
 //! and means nothing has to be migrated. What the published value *means* does change, and it
 //! propagates: the batch and the bundle take their own endpoints from the chunk's, so the value a
@@ -13,7 +14,7 @@ use common::{TSUKI_VERSION_BYTE, base_fee_chunk, feynman_blocks};
 use sbv_core::BlockWitness;
 use sbv_primitives::types::consensus::BlockHeader as _;
 use sbv_primitives::{B256, U256, types::Header};
-use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
+use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute, fork_is_anchored};
 use types_base::{
     fork_name::ForkName,
     public_inputs::MultiVersionPublicInputs,
@@ -72,6 +73,23 @@ fn the_tsuki_public_input_layout_is_unchanged() {
     assert_eq!(pi.len(), 269);
     assert_eq!(&pi[9..41], prev.as_slice());
     assert_eq!(&pi[41..73], post.as_slice());
+}
+
+/// Which forks are anchored is one rule, shared by the chunk path and by anything that assembles
+/// a witness: a harness that kept its own copy would hand a parent header to a fork that refuses
+/// one, which is exactly what `check_parent_header` now rejects.
+#[test]
+fn only_tsuki_and_later_are_anchored() {
+    for fork in [
+        ForkName::EuclidV1,
+        ForkName::EuclidV2,
+        ForkName::Feynman,
+        ForkName::Galileo,
+        ForkName::GalileoV2,
+    ] {
+        assert!(!fork_is_anchored(fork), "{fork} is not anchored");
+    }
+    assert!(fork_is_anchored(ForkName::Tsuki));
 }
 
 /// Earlier forks keep state-root endpoints, and their chunks still need no parent header.

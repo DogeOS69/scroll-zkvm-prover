@@ -54,7 +54,11 @@ fn parse_b256(s: &str) -> Result<B256> {
 }
 
 #[test]
-#[ignore = "this fixture's lineage predates the L2SystemConfig slot-101 proof and the Tsuki fee parameters; it also carries no parent header"]
+/// Ignored first because the integration crate's test binaries do not link, on this branch and on
+/// `dogeos/main` alike (duplicate `da-codec` symbol; see the PR body), and then because this
+/// fixture's lineage predates the L2SystemConfig slot-101 proof and the Tsuki EIP-1559 parameters
+/// and carries no header for the block before its first block.
+#[ignore = "the integration crate's test binaries do not link; this fixture also predates the base-fee rule and carries no parent header"]
 fn dogeos_next_message_index_committed_fixture() -> Result<()> {
     let dir = feature_path();
 
