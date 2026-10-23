@@ -7253,7 +7253,7 @@ dependencies = [
 [[package]]
 name = "sbv-core"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.9#dc16cae0d308537a8bc6fb8be79511a5a672cc4a"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c#0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c"
 dependencies = [
  "alloy-rlp",
  "auto_impl",
@@ -7270,7 +7270,7 @@ dependencies = [
 [[package]]
 name = "sbv-helpers"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.9#dc16cae0d308537a8bc6fb8be79511a5a672cc4a"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c#0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c"
 dependencies = [
  "tracing",
 ]
@@ -7278,7 +7278,7 @@ dependencies = [
 [[package]]
 name = "sbv-primitives"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.9#dc16cae0d308537a8bc6fb8be79511a5a672cc4a"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c#0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -7308,7 +7308,7 @@ dependencies = [
 [[package]]
 name = "sbv-trie"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.9#dc16cae0d308537a8bc6fb8be79511a5a672cc4a"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c#0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c"
 dependencies = [
  "alloy-rlp",
  "alloy-trie 0.9.5",
@@ -7320,7 +7320,7 @@ dependencies = [
 [[package]]
 name = "sbv-utils"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.9#dc16cae0d308537a8bc6fb8be79511a5a672cc4a"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?rev=0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c#0b21cfaf458c2029c564ea9dc53cccf7d8c56a3c"
 dependencies = [
  "alloy-provider",
  "alloy-transport",
