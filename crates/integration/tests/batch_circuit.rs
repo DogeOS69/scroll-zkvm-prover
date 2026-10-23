@@ -74,16 +74,7 @@ fn e2e() -> eyre::Result<()> {
     Ok(())
 }
 
-/// Ignored because the integration crate's test binaries do not link, on this branch and on
-/// `dogeos/main` alike: `da-codec` reaches the graph under two source spellings - `?rev=` via
-/// dogeos-reth-evm and `.git#` via vm-zstd - and both export `compress_scroll_batch_bytes_standard`
-/// unmangled, so any binary pulling both fails with a duplicate symbol. Until that is fixed this
-/// test cannot be run at all.
-///
-/// It has no golden values: its assertion is that the blob encoding is independent of how the
-/// batch is partitioned into chunks, which the endpoint change does not touch. It needs only to be
-/// runnable again.
-#[ignore = "the integration crate's test binaries do not link: duplicate da-codec symbol, pre-existing on dogeos/main"]
+/// The blob encoding must be independent of how the batch is partitioned into chunks.
 #[test]
 fn verify_batch_hash_invariant() -> eyre::Result<()> {
     use scroll_zkvm_types::public_inputs::ForkName;
@@ -153,17 +144,8 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
     Ok(())
 }
 
-/// Ignored because the integration crate's test binaries do not link, on this branch and on
-/// `dogeos/main` alike: `da-codec` reaches the graph under two source spellings - `?rev=` via
-/// dogeos-reth-evm and `.git#` via vm-zstd - and both export `compress_scroll_batch_bytes_standard`
-/// unmangled, so any binary pulling both fails with a duplicate symbol. Until that is fixed this
-/// test cannot be run at all.
-///
-/// Its goldens are the batch public inputs, including the two endpoints the batch takes from its
-/// first and last chunk, which are block hashes from Tsuki; they need recomputing, which needs a
-/// run. The reachable part of that property is pinned by
-/// `the_endpoints_a_batch_would_publish_are_block_hashes` in the chunk crate.
-#[ignore = "the integration crate's test binaries do not link: duplicate da-codec symbol, pre-existing on dogeos/main"]
+/// Regenerate the batch public inputs for the two-chunk native corpus and block-hash endpoints.
+#[ignore = "golden metadata predates the tsuki-base-fee corpus and block-hash endpoints"]
 #[test]
 fn test_tsuki_golden_batch_metadata() -> eyre::Result<()> {
     let chunks = tsuki_golden_chunk_tasks()?

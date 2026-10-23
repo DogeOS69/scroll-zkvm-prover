@@ -9,6 +9,9 @@ on:
       - rust-toolchain.toml
       - Makefile
       - crates/types/**/*
+      - crates/integration/Cargo.toml
+      - crates/integration/src/**/*
+      - crates/integration/tests/**/*
       - crates/integration/testdata/tsuki/**/*
       - crates/integration/testdata/tsuki-base-fee/**/*
   push:
@@ -23,6 +26,9 @@ on:
       - rust-toolchain.toml
       - Makefile
       - crates/types/**/*
+      - crates/integration/Cargo.toml
+      - crates/integration/src/**/*
+      - crates/integration/tests/**/*
       - crates/integration/testdata/tsuki/**/*
       - crates/integration/testdata/tsuki-base-fee/**/*
   workflow_dispatch:
@@ -50,3 +56,6 @@ jobs:
 
       - name: Run chunk witness checks
         run: make test-chunk-witness-checks
+
+      - name: Run batch codec checks
+        run: make test-batch-codec

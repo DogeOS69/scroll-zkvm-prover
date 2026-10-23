@@ -70,11 +70,15 @@ test-tsuki-golden:
 	@if command -v sha256sum >/dev/null 2>&1; then cd crates/integration/testdata/tsuki && sha256sum -c SHA256SUMS; else cd crates/integration/testdata/tsuki && shasum -a 256 -c SHA256SUMS; fi
 	@if command -v sha256sum >/dev/null 2>&1; then cd crates/integration/testdata/tsuki-base-fee && sha256sum -c SHA256SUMS; else cd crates/integration/testdata/tsuki-base-fee && shasum -a 256 -c SHA256SUMS; fi
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration --test chunk_circuit test_tsuki_edge_fixture_contract -- --exact --nocapture
-# The Tsuki golden public inputs, the batch metadata and the blob partition invariant are
-# `#[ignore]`d: the integration crate's test binaries do not link, on this branch or on
-# `dogeos/main`, because `da-codec` is in the graph under two source spellings that both export
-# `compress_scroll_batch_bytes_standard`. Each test says so. Add them back here, without
-# `--ignored`, once that is fixed and their goldens have been recomputed for `tsuki-base-fee`.
+# The chunk and batch golden metadata remain ignored until their expectations are
+# regenerated for the two-chunk `tsuki-base-fee` corpus and block-hash endpoints.
+
+.PHONY: test-batch-codec
+test-batch-codec:
+# Fail if multiple encoder sources make the package specification ambiguous.
+	@cargo tree --locked -p scroll-zkvm-integration --invert encoder-standard >/dev/null
+	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --lib utils::test_build_and_parse_batch_task -- --exact
+	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --test batch_circuit verify_batch_hash_invariant -- --exact
 
 test-chunk-witness-checks:
 	@if command -v sha256sum >/dev/null 2>&1; then cd crates/integration/testdata/tsuki-base-fee && sha256sum -c SHA256SUMS; else cd crates/integration/testdata/tsuki-base-fee && shasum -a 256 -c SHA256SUMS; fi
