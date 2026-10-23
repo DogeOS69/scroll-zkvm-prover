@@ -3,6 +3,7 @@ use crate::{
     version::{Domain, STFVersion, Version},
 };
 use alloy_primitives::{B256, U256};
+use sbv_primitives::types::reth::consensus::validate_gas_limit_against_parent;
 
 /// Number of bytes used to serialise [`BlockContextV2`].
 pub const SIZE_BLOCK_CTX: usize = 52;
@@ -254,7 +255,9 @@ impl ChunkInfo {
     ///     prev msg queue hash ||
     ///     post msg queue hash ||
     ///     initial block number ||
-    ///     block_ctx for block_ctx in block_ctxs
+    ///     block_ctx for block_ctx in block_ctxs ||
+    ///     prev blockhash ||
+    ///     post blockhash
     /// )
     pub fn pi_tsuki(&self, version: Version) -> Vec<u8> {
         std::iter::empty()
@@ -275,6 +278,8 @@ impl ChunkInfo {
                     .collect::<Vec<u8>>()
                     .as_slice(),
             )
+            .chain(self.prev_blockhash.as_slice())
+            .chain(self.post_blockhash.as_slice())
             .copied()
             .collect()
     }
@@ -351,7 +356,8 @@ impl MultiVersionPublicInputs for ChunkInfo {
     /// - state roots MUST be chained
     /// - L1 msg queue hash MUST be chained
     ///
-    /// Furthermore, for validiums we must also chain the blockhashes.
+    /// Tsuki also checks block-number, timestamp, gas-limit, and blockhash continuity.
+    /// Validiums always chain blockhashes and encryption keys.
     fn validate(&self, prev_pi: &Self, version: Version) {
         assert_eq!(self.chain_id, prev_pi.chain_id);
         assert_eq!(self.prev_state_root, prev_pi.post_state_root);
@@ -365,6 +371,39 @@ impl MultiVersionPublicInputs for ChunkInfo {
             );
         }
 
+        if version.fork >= ForkName::Tsuki {
+            let parent = prev_pi
+                .block_ctxs
+                .last()
+                .expect("previous chunk must contain blocks");
+            let child = self.block_ctxs.first().expect("chunk must contain blocks");
+            let previous_block_count =
+                u64::try_from(prev_pi.block_ctxs.len()).expect("block count fits in u64");
+            let expected_number = prev_pi
+                .initial_block_number
+                .checked_add(previous_block_count)
+                .expect("chunk block number overflow");
+            assert_eq!(
+                self.initial_block_number, expected_number,
+                "non-contiguous chunk heights"
+            );
+            assert!(
+                child.timestamp >= parent.timestamp,
+                "chunk timestamp moved backwards"
+            );
+            validate_gas_limit_against_parent(child.gas_limit, parent.gas_limit)
+                .expect("invalid gas limit across chunks");
+        }
+
+        if (version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V11))
+            || version.domain == Domain::Validium
+        {
+            assert_eq!(
+                self.prev_blockhash, prev_pi.post_blockhash,
+                "non-contiguous chunk blockhashes"
+            );
+        }
+
         // message queue hash is used only after euclidv2 (da-codec@v7)
         if version.fork == ForkName::EuclidV1 {
             assert_eq!(self.prev_msg_queue_hash, B256::ZERO);
@@ -373,10 +412,8 @@ impl MultiVersionPublicInputs for ChunkInfo {
             assert_eq!(prev_pi.post_msg_queue_hash, B256::ZERO);
         }
 
-        // - blockhash chaining must be validated for validiums.
-        // - encryption key must be the same between contiguous chunks in a batch.
+        // Encryption keys must be the same between contiguous validium chunks in a batch.
         if version.domain == Domain::Validium {
-            assert_eq!(self.prev_blockhash, prev_pi.post_blockhash);
             assert!(self.encryption_key.is_some());
             assert_eq!(self.encryption_key, prev_pi.encryption_key);
         }
@@ -408,7 +445,7 @@ mod tests {
             block_ctxs: vec![BlockContextV2 {
                 timestamp: 789,
                 base_fee: U256::from(321u64),
-                gas_limit: 654,
+                gas_limit: 20_000_000,
                 num_txs: 3,
                 num_l1_msgs: 1,
             }],
@@ -422,6 +459,8 @@ mod tests {
         ChunkInfo {
             prev_state_root: prev.post_state_root,
             prev_msg_queue_hash: prev.post_msg_queue_hash,
+            prev_blockhash: prev.post_blockhash,
+            initial_block_number: prev.initial_block_number + prev.block_ctxs.len() as u64,
             ..sample_chunk_info(next_message_index)
         }
     }
@@ -465,10 +504,92 @@ mod tests {
     fn tsuki_chunk_pi_layout_commits_next_message_index() {
         let pi = sample_chunk_info(0x0102_0304_0506_0708).pi_tsuki(Version::tsuki());
 
-        assert_eq!(pi.len(), 269);
+        assert_eq!(pi.len(), 333);
         assert_eq!(pi[0], Version::tsuki().as_version_byte());
         assert_eq!(&pi[105..113], &0x0102_0304_0506_0708u64.to_be_bytes());
         assert_eq!(&pi[113..145], B256::repeat_byte(0x55).as_slice());
+        assert_eq!(&pi[269..301], B256::repeat_byte(0x88).as_slice());
+        assert_eq!(&pi[301..333], B256::repeat_byte(0x99).as_slice());
+    }
+
+    #[test]
+    fn tsuki_commits_both_blockhashes_without_changing_older_pi() {
+        let original = sample_chunk_info(22);
+        for previous_hash in [false, true] {
+            let mut changed = original.clone();
+            if previous_hash {
+                changed.prev_blockhash = B256::repeat_byte(1);
+            } else {
+                changed.post_blockhash = B256::repeat_byte(2);
+            }
+            assert_ne!(
+                original.pi_hash_by_version(Version::tsuki()),
+                changed.pi_hash_by_version(Version::tsuki())
+            );
+            assert_eq!(
+                original.pi_hash_by_version(Version::galileo_v2()),
+                changed.pi_hash_by_version(Version::galileo_v2())
+            );
+        }
+    }
+
+    #[test]
+    fn tsuki_chunk_boundaries_accept_equal_timestamps_and_gas_limit_bounds() {
+        let mut prev = sample_chunk_info(22);
+        prev.block_ctxs.resize(3, prev.block_ctxs[0].clone());
+        for gas_limit in [20_000_000 - 19_531, 20_000_000, 20_000_000 + 19_531] {
+            let mut current = next_contiguous_chunk(&prev, 22);
+            current.block_ctxs[0].gas_limit = gas_limit;
+            current.validate(&prev, Version::tsuki());
+        }
+    }
+
+    #[test]
+    fn tsuki_rejects_noncontiguous_chunk_boundaries() {
+        type Mutation = (&'static str, fn(&mut ChunkInfo));
+        let cases: &[Mutation] = &[
+            ("blockhashes", |c| c.prev_blockhash = B256::ZERO),
+            ("heights", |c| c.initial_block_number += 1),
+            ("timestamp", |c| c.block_ctxs[0].timestamp -= 1),
+            ("gas limit", |c| c.block_ctxs[0].gas_limit += 19_532),
+            ("gas limit", |c| c.block_ctxs[0].gas_limit -= 19_532),
+            ("must contain blocks", |c| c.block_ctxs.clear()),
+        ];
+        let prev = sample_chunk_info(22);
+        for (message, mutate) in cases {
+            let mut current = next_contiguous_chunk(&prev, 22);
+            mutate(&mut current);
+            let error = std::panic::catch_unwind(|| current.validate(&prev, Version::tsuki()))
+                .expect_err(message);
+            assert!(panic_message(error).contains(message));
+        }
+    }
+
+    #[test]
+    fn tsuki_rejects_invalid_parent_boundaries_and_subminimum_gas() {
+        let mut prev = sample_chunk_info(22);
+        prev.block_ctxs.clear();
+        let current = next_contiguous_chunk(&prev, 22);
+        assert!(std::panic::catch_unwind(|| current.validate(&prev, Version::tsuki())).is_err());
+
+        let mut prev = sample_chunk_info(22);
+        prev.initial_block_number = u64::MAX;
+        let mut current = sample_chunk_info(22);
+        current.prev_state_root = prev.post_state_root;
+        current.prev_msg_queue_hash = prev.post_msg_queue_hash;
+        current.prev_blockhash = prev.post_blockhash;
+        current.initial_block_number = 0;
+        let error = std::panic::catch_unwind(|| current.validate(&prev, Version::tsuki()))
+            .expect_err("height must not wrap around");
+        assert!(panic_message(error).contains("block number overflow"));
+
+        let mut prev = sample_chunk_info(22);
+        prev.block_ctxs[0].gas_limit = 5_000;
+        let mut current = next_contiguous_chunk(&prev, 22);
+        current.block_ctxs[0].gas_limit = 4_999;
+        let error = std::panic::catch_unwind(|| current.validate(&prev, Version::tsuki()))
+            .expect_err("gas limit below the minimum must be rejected");
+        assert!(panic_message(error).contains("invalid gas limit"));
     }
 
     #[test]

@@ -75,7 +75,11 @@ test-tsuki-golden:
 	@cargo test $(CARGO_CONFIG_FLAG) --release -p scroll-zkvm-integration testers::chunk::tests::test_presets -- --exact --nocapture
 
 test-chunk-witness-checks:
-	@cargo test -p scroll-zkvm-types-chunk --features scroll,host --test compression_infos --test validium_inputs
+	@cargo test -p scroll-zkvm-types-base
+	@cargo test -p scroll-zkvm-types-chunk --features scroll,host --test compression_infos --test validium_inputs --test header_validation
+
+test-tsuki-chunk-metadata:
+	@cargo test $(CARGO_CONFIG_FLAG) -p scroll-zkvm-integration --test chunk_circuit test_tsuki_golden_chunk_metadata -- --exact --nocapture
 
 test-execute-validium-chunk:
 	@cargo test --release -p scroll-zkvm-integration --test chunk_circuit test_execute_validium -- --exact --nocapture
