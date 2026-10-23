@@ -15,7 +15,7 @@ use scroll_zkvm_prover::utils::vm::ExecutionResult;
 use scroll_zkvm_types::{
     proof::ProofEnum,
     public_inputs::{ForkName, Version},
-    scroll::chunk::{ChunkInfo, ChunkWitness, SecretKey, fork_is_anchored},
+    scroll::chunk::{ChunkInfo, ChunkWitness, SecretKey},
 };
 use std::{
     fs::File,
@@ -34,9 +34,7 @@ pub fn read_block_witness_from_testdata(block_n: usize) -> eyre::Result<BlockWit
 
 /// Utility function to read and deserialize block witness given the block number.
 ///
-/// Older corpora use the legacy encoding, so both are tried. A file that is neither reports what
-/// each attempt made of it: reporting only the legacy decoder's error, as this used to, points a
-/// reader at the wrong schema when a current-format witness has one bad field.
+/// Accepts the native SBV format. Legacy corpora must be regenerated with a current node.
 pub fn read_block_witness<P>(path_witness: P) -> eyre::Result<BlockWitness>
 where
     P: AsRef<Path>,
@@ -49,19 +47,8 @@ where
         return Err(eyre::eyre!("File not found: {}", path.display()));
     }
 
-    let current = serde_json::from_reader::<_, BlockWitness>(File::open(path)?);
-    let current_error = match current {
-        Ok(witness) => return Ok(witness),
-        Err(error) => error,
-    };
-    serde_json::from_reader::<_, sbv_primitives::legacy_types::BlockWitness>(File::open(path)?)
-        .map(BlockWitness::from)
-        .map_err(|legacy_error| {
-            eyre::eyre!(
-                "{} is neither a block witness ({current_error}) nor a legacy one ({legacy_error})",
-                path.display()
-            )
-        })
+    serde_json::from_reader(File::open(path)?)
+        .with_context(|| format!("{}: expected a native SBV block witness", path.display()))
 }
 
 pub struct ChunkProverTester;
@@ -127,22 +114,14 @@ fn initial_prev_message_hash(version: Version) -> B256 {
 /// carries its genesis header. Note that the two are written differently: a witness carries its
 /// header in the struct's own field names, while `parent.json` is an RPC block object.
 ///
-/// Only a fork that anchors its chunks gets one at all: `execute` refuses a parent header on an
-/// earlier fork, because it would be anchoring data the chunk then discards, so the fork decides
-/// this before any file is looked for. The rule itself lives in the chunk crate, so the harness
-/// and the chunk path cannot drift apart.
-///
-/// A fork that does anchor cannot proceed without one, so a corpus with neither is a harness
-/// misconfiguration and is reported here, naming both paths that were probed, rather than
-/// surfacing three layers later as a chunk that blames its own witness.
+/// Every supported fork needs a parent for SBV validation. A corpus with neither is reported
+/// here, naming both paths that were probed. Successful reads always return `Some` to match the
+/// chunk witness's wire field.
 pub fn read_parent_header(
     witnesses_dir: &Path,
     first_block: u64,
     fork: ForkName,
 ) -> eyre::Result<Option<Header>> {
-    if !fork_is_anchored(fork) {
-        return Ok(None);
-    }
     let previous = first_block
         .checked_sub(1)
         .map(|previous| witnesses_dir.join(format!("{previous}.json")));
@@ -522,41 +501,30 @@ mod tests {
         std::env::remove_var("BLOCK_RANGE");
     }
 
-    /// The parent header is looked for only for a fork that is anchored to one. A legacy corpus
-    /// always has a preceding witness on disk, and handing that to `execute` would be refused.
-    ///
-    /// This lives here because `read_parent_header` does the file IO, and it cannot run yet: the
-    /// integration crate's test binaries do not link (duplicate `da-codec` symbol, pre-existing on
-    /// `dogeos/main`; see the PR body). The rule it turns on, `fork_is_anchored`, is unit-tested in
-    /// the chunk crate, which does link.
+    /// Parent loading is independent of the public-input endpoint semantics.
     #[test]
-    fn a_parent_header_is_only_read_for_an_anchored_fork() {
-        let dir = Path::new(PATH_TESTDATA).join("feynman").join("witnesses");
-
-        // Block 16525001's predecessor is on disk, and a legacy fork still gets nothing.
-        assert!(dir.join("16525000.json").exists());
-        assert!(
-            read_parent_header(&dir, 16_525_001, ForkName::Feynman)
-                .expect("a legacy fork needs no parent")
-                .is_none()
-        );
-
-        // An anchored fork over a corpus that carries one gets it.
+    fn a_parent_header_is_read_for_every_supported_fork() {
         let tsuki = Path::new(PATH_TESTDATA)
             .join("tsuki-base-fee")
             .join("witnesses");
-        assert!(
-            read_parent_header(&tsuki, 1, ForkName::Tsuki)
-                .expect("the corpus carries its genesis header")
-                .is_some()
-        );
-
-        // An anchored fork over a corpus that carries neither is a reported misconfiguration,
-        // naming both paths it probed.
-        let error = read_parent_header(&dir, 16_525_000, ForkName::Tsuki)
-            .expect_err("an anchored fork cannot proceed without one")
-            .to_string();
-        assert!(error.contains("16524999.json"), "{error}");
-        assert!(error.contains("parent.json"), "{error}");
+        let missing = Path::new(PATH_TESTDATA).join("feynman").join("witnesses");
+        for fork in [
+            ForkName::Feynman,
+            ForkName::Galileo,
+            ForkName::GalileoV2,
+            ForkName::Tsuki,
+        ] {
+            for first_block in [1, 2] {
+                let parent = read_parent_header(&tsuki, first_block, fork)
+                    .expect("genesis and preceding witnesses are available")
+                    .expect("a parent is required");
+                assert_eq!(parent.number, first_block - 1);
+            }
+            let error = read_parent_header(&missing, 16_525_000, fork)
+                .expect_err("every fork requires a parent")
+                .to_string();
+            assert!(error.contains("16524999.json"), "{error}");
+            assert!(error.contains("parent.json"), "{error}");
+        }
     }
 }

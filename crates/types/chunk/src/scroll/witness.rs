@@ -7,12 +7,10 @@ use std::collections::HashSet;
 use types_base::version::Version;
 use types_base::{fork_name::ForkName, public_inputs::scroll::chunk::ChunkInfo};
 
-/// Whether a chunk of this fork is anchored to the header of the block before its first block.
+/// Whether this fork publishes block hashes as its chunk endpoints.
 ///
-/// From Tsuki a chunk's previous endpoint is that header's hash, so the witness carries it and
-/// [`execute`][super::execute] requires it; the earlier forks have state-root endpoints and refuse
-/// one. Anything that assembles a witness asks here rather than keeping its own copy of the rule,
-/// which is how a harness and the chunk path can disagree.
+/// Earlier forks publish state roots. Every supported fork still requires a parent header for
+/// SBV validation, independently of the endpoint semantics.
 pub fn fork_is_anchored(fork: ForkName) -> bool {
     fork >= ForkName::Tsuki
 }
@@ -36,16 +34,16 @@ pub struct ChunkWitness {
     pub validium: Option<ValidiumInputs>,
     /// The header of the block before the chunk's first block.
     ///
-    /// Its hash is the chunk's previous proof endpoint and its state root is the state the chunk
-    /// starts from, so from Tsuki onwards it is what anchors the chunk to the chain. Earlier
-    /// forks keep their historical behaviour and leave it absent.
+    /// Required at execution for every supported fork: SBV checks the first block and pre-state
+    /// against it. From Tsuki its hash is also the chunk's previous proof endpoint; earlier forks
+    /// retain state-root endpoints.
     ///
     /// Adding this field is a **breaking wire change**, and the `Option` does not soften it:
     /// bincode encodes a struct as a fixed-length tuple, so a witness written before this field
     /// existed fails to decode rather than arriving with `None`. A producer outside this repo -
     /// `ProvingTask::serialized_witness` is opaque bytes - has to be bumped in lockstep, which is
-    /// also what the pinned program commitments enforce. The `Option` is here because the field is
-    /// genuinely absent before Tsuki, not for compatibility.
+    /// also what the pinned program commitments enforce. The `Option` preserves this PR's wire
+    /// encoding and allows execution to report a missing parent explicitly; `None` is invalid.
     #[serde_as(as = "Option<sbv_primitives::types::consensus::serde_bincode_compat::Header>")]
     pub parent_header: Option<Header>,
 }

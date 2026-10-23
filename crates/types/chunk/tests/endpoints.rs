@@ -75,9 +75,7 @@ fn the_tsuki_public_input_layout_is_unchanged() {
     assert_eq!(&pi[41..73], post.as_slice());
 }
 
-/// Which forks are anchored is one rule, shared by the chunk path and by anything that assembles
-/// a witness: a harness that kept its own copy would hand a parent header to a fork that refuses
-/// one, which is exactly what `check_parent_header` now rejects.
+/// Endpoint semantics change at Tsuki; parent-header validation applies to every supported fork.
 #[test]
 fn only_tsuki_and_later_are_anchored() {
     for fork in [
@@ -92,19 +90,21 @@ fn only_tsuki_and_later_are_anchored() {
     assert!(fork_is_anchored(ForkName::Tsuki));
 }
 
-/// Earlier forks keep state-root endpoints, and their chunks still need no parent header.
+/// Earlier forks keep state-root endpoints while also validating the supplied parent.
 #[test]
+#[ignore = "Feynman corpus needs native SBV witnesses with L2SystemConfig slot 101 proofs"]
 fn legacy_chunk_endpoints_remain_state_roots() {
     let blocks = feynman_blocks();
+    let (parent, blocks) = blocks.split_first().unwrap();
     let witness = ChunkWitness::new_scroll(
         Version::feynman().as_version_byte(),
-        &blocks,
+        blocks,
         B256::repeat_byte(1),
         ForkName::Feynman,
-        None,
+        Some(parent.header.clone()),
     );
 
-    let chunk_info = execute(witness).expect("a Feynman chunk needs no parent header");
+    let chunk_info = execute(witness).expect("a Feynman chunk with its parent header");
 
     assert_eq!(chunk_info.prev_state_root, blocks[0].prev_state_root);
     assert_eq!(
@@ -258,16 +258,16 @@ fn the_endpoints_a_batch_would_publish_are_block_hashes() {
 }
 
 /// The one new wire field has to survive the encoding the guest decodes, in both states, and the
-/// decoded witness has to execute to the same public inputs as the one that was encoded.
+/// decoded valid witness has to execute to the same public inputs. A missing parent stays invalid.
 #[rstest::rstest]
-#[case::anchored(true)]
-#[case::unanchored(false)]
-fn the_witness_round_trips_through_bincode_and_json(#[case] anchored: bool) {
+#[case::with_parent(true)]
+#[case::missing_parent(false)]
+fn the_witness_round_trips_through_bincode_and_json(#[case] has_parent: bool) {
     let (genesis, blocks) = base_fee_chunk();
-    let witness = if anchored {
+    let witness = if has_parent {
         tsuki_witness(genesis, &blocks)
     } else {
-        // An unanchored witness is an earlier fork's, so use that fork's version too.
+        // Missing parents still round-trip, but no fork may execute such a witness.
         ChunkWitness::new_scroll(
             Version::feynman().as_version_byte(),
             &blocks,
@@ -295,7 +295,7 @@ fn the_witness_round_trips_through_bincode_and_json(#[case] anchored: bool) {
     );
 
     // The decoded witness has to be the same chunk, not merely the same bytes.
-    if anchored {
+    if has_parent {
         assert_eq!(
             execute(decoded)
                 .expect("the decoded chunk")
@@ -303,6 +303,15 @@ fn the_witness_round_trips_through_bincode_and_json(#[case] anchored: bool) {
             execute(witness)
                 .expect("the encoded chunk")
                 .pi_hash_by_version(Version::tsuki())
+        );
+    } else {
+        assert_eq!(
+            execute(decoded).unwrap_err(),
+            "missing parent header for a feynman chunk"
+        );
+        assert_eq!(
+            execute(from_json).unwrap_err(),
+            "missing parent header for a feynman chunk"
         );
     }
 }

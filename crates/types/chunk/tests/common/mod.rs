@@ -11,14 +11,10 @@ use types_base::version::Version;
 
 pub const TSUKI_VERSION_BYTE: u8 = Version::tsuki().as_version_byte();
 
-/// Reads a block witness, falling back to the legacy encoding some older corpora still use.
+/// Reads the native SBV witness format. Legacy corpora must be regenerated before replay.
 fn read_witness(path: &Path) -> BlockWitness {
     let json = std::fs::read(path).unwrap();
-    serde_json::from_slice(&json).unwrap_or_else(|_| {
-        BlockWitness::from(
-            serde_json::from_slice::<sbv_primitives::legacy_types::BlockWitness>(&json).unwrap(),
-        )
-    })
+    serde_json::from_slice(&json).expect("native SBV block witness")
 }
 
 /// Feynman blocks 16525000..=16525004 from the integration test data: a fork whose chunks keep

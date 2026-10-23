@@ -23,8 +23,7 @@ fn validium_inputs(lists: usize) -> ValidiumInputs {
     }
 }
 
-/// The validium version byte's own fork, which a validium witness has to claim. It is before
-/// Tsuki, so a validium chunk is not anchored and carries no parent header.
+/// The validium version byte's own fork, which a validium witness has to claim.
 fn validium_fork() -> ForkName {
     Version::validium_v1().fork
 }
@@ -114,25 +113,21 @@ fn a_fork_that_is_not_the_versions_own_is_rejected() {
     );
 }
 
-/// An earlier fork is not anchored to anything, so supplying a parent header would hand the chunk
-/// anchoring data it then discards. Refused in that direction too.
+/// Earlier forks also require a parent header even though they publish state-root endpoints.
 #[test]
-fn a_parent_header_on_an_unanchored_fork_is_rejected() {
-    let (parent, blocks) = base_fee_chunk();
+fn a_legacy_chunk_without_a_parent_header_is_rejected() {
+    let (_, blocks) = base_fee_chunk();
     let witness = ChunkWitness::new_scroll(
         Version::feynman().as_version_byte(),
         &blocks,
         B256::ZERO,
         ForkName::Feynman,
-        Some(parent),
+        None,
     );
 
-    let err = execute(witness).expect_err("an unanchored fork must not take a parent header");
+    let err = execute(witness).expect_err("a legacy fork also requires a parent header");
     assert_eq!(
         err,
-        format!(
-            "parent header supplied for a {} chunk, which is not anchored to one",
-            ForkName::Feynman
-        )
+        format!("missing parent header for a {} chunk", ForkName::Feynman)
     );
 }
