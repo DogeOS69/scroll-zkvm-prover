@@ -14,6 +14,7 @@ on:
       - crates/integration/tests/**/*
       - crates/integration/testdata/tsuki/**/*
       - crates/integration/testdata/tsuki-base-fee/**/*
+      - crates/integration/testdata/validium/**/*
   push:
     branches:
       - master
@@ -31,6 +32,7 @@ on:
       - crates/integration/tests/**/*
       - crates/integration/testdata/tsuki/**/*
       - crates/integration/testdata/tsuki-base-fee/**/*
+      - crates/integration/testdata/validium/**/*
   workflow_dispatch:
 
 concurrency:
@@ -59,3 +61,6 @@ jobs:
 
       - name: Run batch codec checks
         run: make test-batch-codec
+
+      - name: Run parent header caller checks
+        run: make test-parent-header-callers

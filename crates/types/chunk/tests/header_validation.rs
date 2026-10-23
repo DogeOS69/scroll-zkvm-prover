@@ -23,7 +23,7 @@ fn tsuki_witness() -> ChunkWitness {
         &blocks,
         B256::ZERO,
         ForkName::Tsuki,
-        Some(parent),
+        parent,
     )
 }
 
@@ -89,14 +89,8 @@ fn noncanonical_headers_are_rejected_before_execution() {
 /// A Tsuki chunk has to carry the header it is anchored to.
 #[test]
 fn a_tsuki_chunk_without_a_parent_header_is_rejected() {
-    let (_, blocks) = base_fee_chunk();
-    let witness = ChunkWitness::new_scroll(
-        TSUKI_VERSION_BYTE,
-        &blocks,
-        B256::ZERO,
-        ForkName::Tsuki,
-        None,
-    );
+    let mut witness = tsuki_witness();
+    witness.parent_header = None;
 
     assert_eq!(
         execute(witness).expect_err("a Tsuki chunk must carry its parent header"),
@@ -150,7 +144,7 @@ fn headers_are_validated_against_their_parent() {
                 chunk,
                 B256::ZERO,
                 ForkName::Tsuki,
-                Some(parent),
+                parent,
             );
             let offending = witness.blocks.len() - 1;
             mutate(&mut witness.blocks[offending].header);

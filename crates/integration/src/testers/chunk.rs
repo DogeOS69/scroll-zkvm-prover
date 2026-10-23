@@ -107,48 +107,55 @@ fn initial_prev_message_hash(version: Version) -> B256 {
     }
 }
 
-/// The trusted header of the block before a chunk's first block.
+/// Load the header of the block before a chunk's first block. SBV validates its hash at execution.
 ///
-/// It is the witness of the preceding block when the corpus has one, and otherwise the header in
-/// `<witnesses_dir>/parent.json`, which is how a corpus that starts at the chain's first block
-/// carries its genesis header. Note that the two are written differently: a witness carries its
-/// header in the struct's own field names, while `parent.json` is an RPC block object.
+/// Prefer the preceding block's native witness, then `<first_block>.parent.json` for sparse
+/// corpora, then `parent.json` for the start of a contiguous corpus (including genesis).
+/// Header files are RPC block objects; native witnesses use their own header field names.
 ///
-/// Every supported fork needs a parent for SBV validation. A corpus with neither is reported
-/// here, naming both paths that were probed. Successful reads always return `Some` to match the
-/// chunk witness's wire field.
+/// Every supported fork needs a parent for SBV validation. A corpus with no parent is reported
+/// here, naming all paths that were probed. Successful reads always return a concrete header.
 pub fn read_parent_header(
     witnesses_dir: &Path,
     first_block: u64,
     fork: ForkName,
-) -> eyre::Result<Option<Header>> {
-    let previous = first_block
+) -> eyre::Result<Header> {
+    let parent_number = first_block
         .checked_sub(1)
-        .map(|previous| witnesses_dir.join(format!("{previous}.json")));
-    if let Some(path) = &previous {
-        if path
-            .try_exists()
-            .with_context(|| path.display().to_string())?
-        {
-            return Ok(Some(read_block_witness(path)?.header));
-        }
-    }
-    let genesis = witnesses_dir.join("parent.json");
-    if genesis
+        .wrap_err("a chunk cannot start at genesis: block 0 has no parent")?;
+    let previous = witnesses_dir.join(format!("{parent_number}.json"));
+    let per_block = witnesses_dir.join(format!("{first_block}.parent.json"));
+    let parent_file = witnesses_dir.join("parent.json");
+    let (header, source): (Header, _) = if previous
         .try_exists()
-        .with_context(|| genesis.display().to_string())?
+        .with_context(|| previous.display().to_string())?
     {
-        return Ok(Some(read_json(&genesis)?));
-    }
-    eyre::bail!(
-        "a {fork} chunk starting at block {first_block} needs the header of the block before it, \
-         and the corpus carries neither {} nor {}",
-        previous.as_ref().map_or_else(
-            || "a preceding witness".to_string(),
-            |path| path.display().to_string()
-        ),
-        genesis.display(),
-    )
+        (read_block_witness(&previous)?.header, previous)
+    } else if per_block
+        .try_exists()
+        .with_context(|| per_block.display().to_string())?
+    {
+        (read_json(&per_block)?, per_block)
+    } else if parent_file
+        .try_exists()
+        .with_context(|| parent_file.display().to_string())?
+    {
+        (read_json(&parent_file)?, parent_file)
+    } else {
+        eyre::bail!(
+            "a {fork} chunk starting at block {first_block} needs its parent header; missing {}, {} and {}",
+            previous.display(),
+            per_block.display(),
+            parent_file.display(),
+        );
+    };
+    eyre::ensure!(
+        header.number == parent_number,
+        "{} contains block {}, expected parent block {parent_number} for chunk starting at {first_block}",
+        source.display(),
+        header.number
+    );
+    Ok(header)
 }
 
 impl ChunkTaskGenerator {
@@ -251,31 +258,46 @@ pub fn get_witness_from_env_or_builder(
         Err(_) => return fallback_generator.get_or_build_witness(),
     };
 
-    let block_witnesses = paths
-        .iter()
-        .map(read_block_witness)
-        .collect::<eyre::Result<Vec<BlockWitness>>>()?;
-    let first = block_witnesses
-        .first()
-        .wrap_err("TRACE_PATH matched no witnesses")?;
+    read_scroll_chunk_from_paths(paths, testing_version())
+}
 
-    let version = testing_version().as_version_byte();
+fn read_scroll_chunk_from_paths(
+    paths: Vec<PathBuf>,
+    version: Version,
+) -> eyre::Result<ChunkWitness> {
+    let mut blocks = paths
+        .into_iter()
+        .filter(|path| {
+            !path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name == "parent.json" || name.ends_with(".parent.json"))
+        })
+        .map(|path| read_block_witness(&path).map(|block| (path, block)))
+        .collect::<eyre::Result<Vec<_>>>()?;
+    blocks.sort_by_key(|(_, block)| block.header.number);
+    let (first_path, first) = blocks.first().wrap_err("TRACE_PATH matched no witnesses")?;
+
     // The parent comes from the directory the witnesses themselves came from, not from the fork's
     // testdata: a TRACE_PATH run is pointed at some other corpus, whose parent is not the
     // fixtures'.
     let parent_header = read_parent_header(
-        paths[0]
+        first_path
             .parent()
             .wrap_err("TRACE_PATH witnesses need a directory")?,
         first.header.number,
-        testing_hardfork(),
+        version.fork,
     )?;
+    let block_witnesses = blocks
+        .into_iter()
+        .map(|(_, block)| block)
+        .collect::<Vec<_>>();
 
     Ok(ChunkWitness::new_scroll(
-        version,
+        version.as_version_byte(),
         &block_witnesses,
-        initial_prev_message_hash(testing_version()),
-        testing_hardfork(),
+        initial_prev_message_hash(version),
+        version.fork,
         parent_header,
     ))
 }
@@ -516,8 +538,7 @@ mod tests {
         ] {
             for first_block in [1, 2] {
                 let parent = read_parent_header(&tsuki, first_block, fork)
-                    .expect("genesis and preceding witnesses are available")
-                    .expect("a parent is required");
+                    .expect("genesis and preceding witnesses are available");
                 assert_eq!(parent.number, first_block - 1);
             }
             let error = read_parent_header(&missing, 16_525_000, fork)
@@ -526,5 +547,115 @@ mod tests {
             assert!(error.contains("16524999.json"), "{error}");
             assert!(error.contains("parent.json"), "{error}");
         }
+    }
+
+    #[test]
+    fn sparse_validium_blocks_load_their_own_parent_headers() {
+        use super::read_block_witness;
+        use sbv_primitives::B256;
+        use scroll_zkvm_types::{
+            public_inputs::Version,
+            scroll::chunk::{ChunkWitness, SecretKey},
+        };
+
+        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let dir = tempfile::tempdir().unwrap();
+        for number in [2, 5] {
+            let parent = read_block_witness(source.join(format!("{}.json", number - 1)))
+                .unwrap()
+                .header;
+            // A sparse validium corpus contains a parent header, not a full preceding witness.
+            std::fs::write(
+                dir.path().join(format!("{number}.parent.json")),
+                serde_json::to_vec(&parent).unwrap(),
+            )
+            .unwrap();
+            let version = Version::validium_v1();
+            let loaded = read_parent_header(dir.path(), number, version.fork).unwrap();
+            let block = read_block_witness(source.join(format!("{number}.json"))).unwrap();
+            assert_eq!(loaded.hash_slow(), block.header.parent_hash);
+            let witness = ChunkWitness::new_validium(
+                version.as_version_byte(),
+                &[block],
+                B256::ZERO,
+                version.fork,
+                vec![vec![]],
+                SecretKey::try_from_bytes([1u8; 32]).unwrap(),
+                loaded,
+            );
+            assert_eq!(
+                witness.parent_header.unwrap().hash_slow(),
+                parent.hash_slow()
+            );
+        }
+    }
+
+    #[test]
+    fn parent_files_cannot_silently_select_the_wrong_height() {
+        use super::read_block_witness;
+        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let dir = tempfile::tempdir().unwrap();
+        let parent = read_block_witness(source.join("1.json")).unwrap().header;
+        std::fs::write(
+            dir.path().join("parent.json"),
+            serde_json::to_vec(&parent).unwrap(),
+        )
+        .unwrap();
+        let error = read_parent_header(dir.path(), 5, ForkName::Tsuki)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("expected parent block 4"), "{error}");
+        assert!(
+            read_parent_header(dir.path(), 0, ForkName::Tsuki)
+                .unwrap_err()
+                .to_string()
+                .contains("genesis")
+        );
+        // A present but malformed block-specific parent must not fall back to parent.json.
+        std::fs::write(dir.path().join("2.parent.json"), b"null").unwrap();
+        assert!(read_parent_header(dir.path(), 2, ForkName::Tsuki).is_err());
+    }
+
+    #[test]
+    fn trace_paths_load_the_first_blocks_parent_and_skip_header_files() {
+        use super::{read_block_witness, read_scroll_chunk_from_paths};
+        use scroll_zkvm_types::{public_inputs::Version, scroll::chunk::execute};
+        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["parent.json", "1.json", "2.json"] {
+            std::fs::copy(source.join(name), dir.path().join(name)).unwrap();
+        }
+        let first = read_block_witness(source.join("1.json")).unwrap();
+        std::fs::write(
+            dir.path().join("2.parent.json"),
+            serde_json::to_vec(&first.header).unwrap(),
+        )
+        .unwrap();
+        let witness = read_scroll_chunk_from_paths(
+            ["2.json", "parent.json", "2.parent.json", "1.json"]
+                .map(|name| dir.path().join(name))
+                .to_vec(),
+            Version::tsuki(),
+        )
+        .unwrap();
+        assert_eq!(
+            witness
+                .blocks
+                .iter()
+                .map(|b| b.header.number)
+                .collect::<Vec<_>>(),
+            [1, 2]
+        );
+        assert_eq!(
+            witness.parent_header.as_ref().unwrap().hash_slow(),
+            first.header.parent_hash
+        );
+        execute(witness).expect("the loaded parent and native witnesses must execute together");
+        assert!(
+            read_scroll_chunk_from_paths(vec![dir.path().join("parent.json")], Version::tsuki())
+                .unwrap_err()
+                .to_string()
+                .contains("matched no witnesses")
+        );
     }
 }

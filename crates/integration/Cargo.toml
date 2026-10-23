@@ -62,6 +62,7 @@ dotenvy.workspace = true
 
 [dev-dependencies]
 glob = "0.3"
+tempfile = "3"
 
 [features]
 default = ["limit-logs", "scroll"]

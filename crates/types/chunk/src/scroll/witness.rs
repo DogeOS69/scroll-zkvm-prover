@@ -44,6 +44,7 @@ pub struct ChunkWitness {
     /// `ProvingTask::serialized_witness` is opaque bytes - has to be bumped in lockstep, which is
     /// also what the pinned program commitments enforce. The `Option` preserves this PR's wire
     /// encoding and allows execution to report a missing parent explicitly; `None` is invalid.
+    /// Constructors require a concrete `Header` so callers cannot accidentally omit it.
     #[serde_as(as = "Option<sbv_primitives::types::consensus::serde_bincode_compat::Header>")]
     pub parent_header: Option<Header>,
 }
@@ -65,12 +66,13 @@ pub struct ChunkDetails {
 }
 
 impl ChunkWitness {
+    /// Construct a Scroll witness with the header preceding its first block.
     pub fn new_scroll(
         version: u8,
         blocks: &[BlockWitness],
         prev_msg_queue_hash: B256,
         fork_name: ForkName,
-        parent_header: Option<Header>,
+        parent_header: Header,
     ) -> Self {
         Self::new(
             version,
@@ -89,7 +91,7 @@ impl ChunkWitness {
         fork_name: ForkName,
         validium_txs: Vec<Vec<TxL1Message>>,
         secret_key: SecretKey,
-        parent_header: Option<Header>,
+        parent_header: Header,
     ) -> Self {
         Self::new(
             version,
@@ -110,7 +112,7 @@ impl ChunkWitness {
         prev_msg_queue_hash: B256,
         fork_name: ForkName,
         validium: Option<ValidiumInputs>,
-        parent_header: Option<Header>,
+        parent_header: Header,
     ) -> Self {
         let num_codes = blocks.iter().map(|w| w.codes.len()).sum();
         let mut codes = HashSet::with_capacity(num_codes);
@@ -153,7 +155,7 @@ impl ChunkWitness {
             fork_name,
             compression_infos,
             validium,
-            parent_header,
+            parent_header: Some(parent_header),
         }
     }
 

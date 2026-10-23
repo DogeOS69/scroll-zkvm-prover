@@ -33,7 +33,7 @@ fn tsuki_witness(parent: Header, blocks: &[BlockWitness]) -> ChunkWitness {
         blocks,
         B256::ZERO,
         ForkName::Tsuki,
-        Some(parent),
+        parent,
     )
 }
 
@@ -101,7 +101,7 @@ fn legacy_chunk_endpoints_remain_state_roots() {
         blocks,
         B256::repeat_byte(1),
         ForkName::Feynman,
-        Some(parent.header.clone()),
+        parent.header.clone(),
     );
 
     let chunk_info = execute(witness).expect("a Feynman chunk with its parent header");
@@ -206,7 +206,7 @@ fn a_chained_tsuki_pair_validates() {
         &blocks[4..],
         first.post_msg_queue_hash,
         ForkName::Tsuki,
-        Some(boundary.header.clone()),
+        boundary.header.clone(),
     );
     let second = execute(second).expect("the second chunk");
 
@@ -239,7 +239,7 @@ fn the_endpoints_a_batch_would_publish_are_block_hashes() {
         &blocks[4..],
         first.post_msg_queue_hash,
         ForkName::Tsuki,
-        Some(boundary.header.clone()),
+        boundary.header.clone(),
     ))
     .expect("the last chunk");
 
@@ -268,13 +268,15 @@ fn the_witness_round_trips_through_bincode_and_json(#[case] has_parent: bool) {
         tsuki_witness(genesis, &blocks)
     } else {
         // Missing parents still round-trip, but no fork may execute such a witness.
-        ChunkWitness::new_scroll(
+        let mut witness = ChunkWitness::new_scroll(
             Version::feynman().as_version_byte(),
             &blocks,
             B256::ZERO,
             ForkName::Feynman,
-            None,
-        )
+            genesis,
+        );
+        witness.parent_header = None;
+        witness
     };
     let expected = witness.parent_header.as_ref().map(Header::hash_slow);
 

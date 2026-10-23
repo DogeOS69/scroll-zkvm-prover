@@ -4,13 +4,17 @@ use alloy_transport::layers::{RetryBackoffLayer, ThrottleLayer};
 use clap::Parser;
 use eyre::{Context, ContextCompat};
 use sbv_core::BlockWitness;
-use sbv_primitives::{B256, types::Network};
+use sbv_primitives::{
+    B256,
+    types::{Header, Network},
+};
 use sbv_utils::rpc::ProviderExt;
 use scroll_zkvm_integration::{
     ProverTester,
     testers::chunk::{ChunkProverTester, exec_chunk},
+    testing_version,
 };
-use scroll_zkvm_types::{scroll::chunk::ChunkWitness, version};
+use scroll_zkvm_types::{public_inputs::Version, scroll::chunk::ChunkWitness};
 use std::collections::HashMap;
 use std::{fs::File, path::PathBuf, slice};
 use url::Url;
@@ -148,34 +152,40 @@ async fn main() -> eyre::Result<()> {
         n_chunks = cli.n_chunks,
     );
 
+    eyre::ensure!(
+        start_block > 0,
+        "cannot scan genesis: block 0 has no parent"
+    );
+    eyre::ensure!(cli.n_chunks > 0, "N_CHUNKS must be positive");
+    let gas_target = cli
+        .chunk_gas_target
+        .checked_mul(1_000_000)
+        .context("CHUNK_GAS_TARGET overflowed")?;
+    let version = testing_version();
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
-    tokio::spawn(fetcher(tx, provider.clone(), start_block));
+    let fetch_task = tokio::spawn(fetcher(tx, provider, start_block));
 
-    let mut blocks = vec![];
-    let mut gas_used = 0u64;
+    let mut pending: Option<PendingChunk> = None;
     let mut n_chunks = 0;
-    while let Some(block) = rx.recv().await {
-        // FIXME: hhq
-        use scroll_zkvm_types::public_inputs::ForkName::Feynman;
-        let (_, gas) = exec_chunk(&ChunkWitness::new(
-            version::Version::feynman().as_version_byte(),
+    while let Some((parent_header, block)) = rx.recv().await {
+        let (_, block_gas) = exec_chunk(&ChunkWitness::new_scroll(
+            version.as_version_byte(),
             slice::from_ref(&block),
             B256::ZERO,
-            Feynman,
-            None,
-            None,
+            version.fork,
+            parent_header.clone(),
         ))?;
 
-        if gas + gas_used > cli.chunk_gas_target * 1_000_000 {
-            let wit = ChunkWitness::new(
-                version::Version::feynman().as_version_byte(),
-                &blocks,
-                B256::ZERO,
-                Feynman,
-                None,
-                None,
-            );
+        let completed = if let Some(chunk) = &mut pending {
+            chunk.push(parent_header, block, block_gas, gas_target)
+        } else {
+            pending = Some(PendingChunk::new(parent_header, block, block_gas));
+            None
+        };
+        if let Some(chunk) = completed {
+            let wit = chunk.into_witness(version);
             let (exec_result, gas) = exec_chunk(&wit)?;
+            let blocks = &wit.blocks;
 
             let start_block = blocks[0].header.number;
             let end_block = blocks.last().unwrap().header.number;
@@ -214,41 +224,298 @@ async fn main() -> eyre::Result<()> {
                 .serialize(stats)
                 .context("Failed to write stats to CSV")?;
             writer.flush().context("Failed to flush CSV")?;
-            blocks = vec![block];
-            gas_used = gas;
             n_chunks += 1;
             if n_chunks >= cli.n_chunks {
-                break;
+                fetch_task.abort();
+                return Ok(());
             }
-        } else {
-            blocks.push(block);
-            gas_used += gas;
         }
     }
 
-    Ok(())
+    // A failed RPC task must not turn into a successful, silently truncated scan.
+    fetch_task.await.context("block fetcher task failed")??;
+    eyre::bail!("block fetcher stopped before the requested chunks were scanned")
+}
+
+/// A nonempty chunk retains the parent of its first block as later blocks arrive.
+struct PendingChunk {
+    parent_header: Header,
+    blocks: Vec<BlockWitness>,
+    gas_used: u64,
+}
+
+impl PendingChunk {
+    fn new(parent_header: Header, block: BlockWitness, gas_used: u64) -> Self {
+        Self {
+            parent_header,
+            blocks: vec![block],
+            gas_used,
+        }
+    }
+
+    fn push(
+        &mut self,
+        parent_header: Header,
+        block: BlockWitness,
+        gas: u64,
+        target: u64,
+    ) -> Option<Self> {
+        if self.gas_used.saturating_add(gas) > target {
+            // Carry this block's own gas and parent into the next chunk, including when a
+            // single block exceeds the target. Never try to execute an empty chunk.
+            Some(std::mem::replace(
+                self,
+                Self::new(parent_header, block, gas),
+            ))
+        } else {
+            self.blocks.push(block);
+            self.gas_used += gas;
+            None
+        }
+    }
+
+    fn into_witness(self, version: Version) -> ChunkWitness {
+        ChunkWitness::new_scroll(
+            version.as_version_byte(),
+            &self.blocks,
+            B256::ZERO,
+            version.fork,
+            self.parent_header,
+        )
+    }
+}
+
+async fn parent_for_block(
+    provider: &impl Provider<Network>,
+    child: &Header,
+    cached_parent: Option<Header>,
+) -> eyre::Result<Header> {
+    let parent = match cached_parent {
+        Some(parent) => parent,
+        None => {
+            provider
+                .get_block_by_hash(child.parent_hash)
+                .await?
+                .with_context(|| {
+                    format!(
+                        "parent {} of block {} not found",
+                        child.parent_hash, child.number
+                    )
+                })?
+                .header
+                .inner
+        }
+    };
+    eyre::ensure!(
+        parent.number.checked_add(1) == Some(child.number),
+        "parent block {} does not precede block {}",
+        parent.number,
+        child.number
+    );
+    eyre::ensure!(
+        parent.hash_slow() == child.parent_hash,
+        "parent hash mismatch for block {}; the scanned chain may have reorganized",
+        child.number
+    );
+    Ok(parent)
 }
 
 async fn fetcher(
-    tx: tokio::sync::mpsc::Sender<BlockWitness>,
-    provider: impl Provider<Network> + Clone,
+    tx: tokio::sync::mpsc::Sender<(Header, BlockWitness)>,
+    provider: impl Provider<Network>,
     start_block: u64,
 ) -> eyre::Result<()> {
+    eyre::ensure!(
+        start_block > 0,
+        "cannot scan genesis: block 0 has no parent"
+    );
     let mut block_number = start_block;
-    let prev_state_root: Option<B256> = None;
+    let mut previous_header = None;
     loop {
-        let req = provider.dump_block_witness(block_number);
-        let req = if let Some(prev_state_root) = prev_state_root {
-            req.with_prev_state_root(prev_state_root)
-        } else {
-            req
-        };
-        let Some(block) = req.send().await.transpose() else {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await; // wait for new block
+        let Some(block) = provider
+            .get_block_by_number(block_number.into())
+            .full()
+            .await?
+        else {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             continue;
         };
-        let block = block?;
-        tx.send(block).await?;
-        block_number += 1;
+        let parent =
+            parent_for_block(&provider, &block.header.inner, previous_header.take()).await?;
+        let witness = provider
+            .dump_block_witness(block_number)
+            .with_cached_block(block)
+            .with_prev_state_root(parent.state_root)
+            .send()
+            .await?
+            .with_context(|| format!("witness for block {block_number} not found"))?;
+        previous_header = Some(witness.header.clone());
+        tx.send((parent, witness)).await?;
+        block_number = block_number
+            .checked_add(1)
+            .context("block number overflowed")?;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_transport::mock::Asserter;
+    use scroll_zkvm_integration::testers::chunk::{read_block_witness, read_parent_header};
+    use scroll_zkvm_types::scroll::chunk::execute;
+    use std::path::Path;
+
+    fn fixture(number: u64) -> BlockWitness {
+        read_block_witness(
+            Path::new("testdata/tsuki-base-fee/witnesses").join(format!("{number}.json")),
+        )
+        .unwrap()
+    }
+
+    fn genesis() -> Header {
+        read_parent_header(
+            Path::new("testdata/tsuki-base-fee/witnesses"),
+            1,
+            Version::tsuki().fork,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn chunk_boundaries_keep_the_correct_parent_and_incoming_gas() {
+        let version = Version::tsuki();
+        let first = fixture(1);
+        let mut pending = PendingChunk::new(genesis(), first, 1);
+        let mut completed = Vec::new();
+        for number in 2..=7 {
+            let block = fixture(number);
+            let parent = fixture(number - 1).header;
+            execute(ChunkWitness::new_scroll(
+                version.as_version_byte(),
+                slice::from_ref(&block),
+                B256::ZERO,
+                version.fork,
+                parent.clone(),
+            ))
+            .expect("single-block scan has its own parent");
+            if let Some(chunk) = pending.push(parent, block, 1, 3) {
+                assert_eq!(pending.gas_used, 1);
+                completed.push(chunk);
+            }
+        }
+        completed.push(pending);
+        let mut previous_hash = genesis().hash_slow();
+        for (chunk, (start, end)) in completed.into_iter().zip([(1, 3), (4, 6), (7, 7)]) {
+            assert_eq!(chunk.blocks.first().unwrap().header.number, start);
+            assert_eq!(chunk.blocks.last().unwrap().header.number, end);
+            assert_eq!(chunk.parent_header.hash_slow(), previous_hash);
+            let info = execute(chunk.into_witness(version))
+                .expect("scanner chunk must pass SBV validation");
+            assert_eq!(info.prev_blockhash, previous_hash);
+            previous_hash = info.post_blockhash;
+        }
+        assert_eq!(previous_hash, fixture(7).header.hash_slow());
+    }
+
+    #[test]
+    fn oversized_blocks_never_emit_an_empty_chunk() {
+        let mut pending = PendingChunk::new(genesis(), fixture(1), 5);
+        let completed = pending.push(fixture(1).header, fixture(2), 2, 3).unwrap();
+        assert_eq!(completed.blocks.len(), 1);
+        assert_eq!(completed.parent_header.number, 0);
+        assert_eq!(pending.parent_header.number, 1);
+        assert_eq!(pending.gas_used, 2);
+        assert!(pending.push(fixture(2).header, fixture(3), 1, 3).is_none());
+        assert_eq!(pending.blocks.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn rpc_parent_loading_handles_genesis_missing_and_wrong_headers() {
+        let responses = Asserter::new();
+        let provider =
+            ProviderBuilder::<_, _, Network>::default().connect_mocked_client(responses.clone());
+        let rpc_parent: serde_json::Value = serde_json::from_slice(
+            &std::fs::read("testdata/tsuki-base-fee/witnesses/parent.json").unwrap(),
+        )
+        .unwrap();
+        let child = fixture(1).header;
+        responses.push_success(&rpc_parent);
+        let parent = parent_for_block(&provider, &child, None).await.unwrap();
+        assert_eq!(parent.hash_slow(), child.parent_hash);
+        responses.push_success(&serde_json::Value::Null);
+        assert!(
+            parent_for_block(&provider, &child, None)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("not found")
+        );
+        let mut wrong = rpc_parent;
+        wrong["stateRoot"] = serde_json::to_value(B256::repeat_byte(9)).unwrap();
+        responses.push_success(&wrong);
+        assert!(
+            parent_for_block(&provider, &child, None)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("parent hash mismatch")
+        );
+    }
+
+    #[tokio::test]
+    async fn cached_parents_require_continuity_without_another_rpc() {
+        let provider =
+            ProviderBuilder::<_, _, Network>::default().connect_mocked_client(Asserter::new());
+        let child = fixture(2).header;
+        let parent = fixture(1).header;
+        assert_eq!(
+            parent_for_block(&provider, &child, Some(parent.clone()))
+                .await
+                .unwrap(),
+            parent
+        );
+        let mut reorg_parent = parent;
+        reorg_parent.timestamp += 1;
+        assert!(
+            parent_for_block(&provider, &child, Some(reorg_parent))
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("parent hash mismatch")
+        );
+        assert!(
+            parent_for_block(&provider, &child, Some(genesis()))
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("does not precede")
+        );
+    }
+
+    #[tokio::test]
+    async fn fetcher_errors_are_available_to_the_scanner_after_channel_closure() {
+        let responses = Asserter::new();
+        responses.push_failure_msg("RPC unavailable");
+        let provider = ProviderBuilder::<_, _, Network>::default().connect_mocked_client(responses);
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        let task = tokio::spawn(fetcher(tx, provider, 1));
+        assert!(rx.recv().await.is_none());
+        assert!(
+            task.await
+                .unwrap()
+                .unwrap_err()
+                .to_string()
+                .contains("RPC unavailable")
+        );
+        let provider =
+            ProviderBuilder::<_, _, Network>::default().connect_mocked_client(Asserter::new());
+        let (tx, _) = tokio::sync::mpsc::channel(1);
+        assert!(
+            fetcher(tx, provider, 0)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("genesis")
+        );
     }
 }

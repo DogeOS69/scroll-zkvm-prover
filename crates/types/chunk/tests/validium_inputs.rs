@@ -37,7 +37,7 @@ fn scroll_domain_chunk_with_validium_inputs_is_rejected() {
             &blocks,
             B256::ZERO,
             ForkName::Tsuki,
-            Some(parent.clone()),
+            parent.clone(),
         );
         witness.validium = Some(validium_inputs(lists));
 
@@ -48,14 +48,14 @@ fn scroll_domain_chunk_with_validium_inputs_is_rejected() {
 
 #[test]
 fn validium_domain_chunk_without_validium_inputs_is_rejected() {
-    let (_, blocks) = base_fee_chunk();
+    let (parent, blocks) = base_fee_chunk();
     let witness = ChunkWitness::new(
         Version::validium_v1().as_version_byte(),
         &blocks,
         B256::ZERO,
         validium_fork(),
         None,
-        None,
+        parent,
     );
 
     let err = execute(witness).expect_err("a validium chunk needs validium inputs");
@@ -64,7 +64,7 @@ fn validium_domain_chunk_without_validium_inputs_is_rejected() {
 
 #[test]
 fn validium_inputs_need_one_list_per_block() {
-    let (_, blocks) = base_fee_chunk();
+    let (parent, blocks) = base_fee_chunk();
     for lists in [0, blocks.len() - 1, blocks.len() + 1] {
         let witness = ChunkWitness::new(
             Version::validium_v1().as_version_byte(),
@@ -72,7 +72,7 @@ fn validium_inputs_need_one_list_per_block() {
             B256::ZERO,
             validium_fork(),
             Some(validium_inputs(lists)),
-            None,
+            parent.clone(),
         );
 
         let err = execute(witness).expect_err("validium lists must match the blocks");
@@ -98,7 +98,7 @@ fn a_fork_that_is_not_the_versions_own_is_rejected() {
         B256::ZERO,
         ForkName::Tsuki,
         Some(validium_inputs(blocks.len())),
-        Some(parent),
+        parent,
     );
 
     let err = execute(witness).expect_err("the fork must be the version byte's own");
@@ -116,14 +116,15 @@ fn a_fork_that_is_not_the_versions_own_is_rejected() {
 /// Earlier forks also require a parent header even though they publish state-root endpoints.
 #[test]
 fn a_legacy_chunk_without_a_parent_header_is_rejected() {
-    let (_, blocks) = base_fee_chunk();
-    let witness = ChunkWitness::new_scroll(
+    let (parent, blocks) = base_fee_chunk();
+    let mut witness = ChunkWitness::new_scroll(
         Version::feynman().as_version_byte(),
         &blocks,
         B256::ZERO,
         ForkName::Feynman,
-        None,
+        parent,
     );
+    witness.parent_header = None;
 
     let err = execute(witness).expect_err("a legacy fork also requires a parent header");
     assert_eq!(

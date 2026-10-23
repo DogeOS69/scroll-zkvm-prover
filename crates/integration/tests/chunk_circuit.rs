@@ -2,8 +2,8 @@ use alloy_primitives::{B256, b256};
 use eyre::Ok;
 use sbv_primitives::types::consensus::TxL1Message;
 use scroll_zkvm_integration::testers::PATH_TESTDATA;
-use scroll_zkvm_integration::testers::chunk::read_block_witness;
 use scroll_zkvm_integration::testers::chunk::{exec_chunk, execute_multi};
+use scroll_zkvm_integration::testers::chunk::{read_block_witness, read_parent_header};
 use scroll_zkvm_integration::utils::get_rayon_threads;
 use scroll_zkvm_integration::{
     ProverTester, prove_verify,
@@ -68,6 +68,7 @@ fn test_execute_validium() -> eyre::Result<()> {
             read_json(base_dir.join(format!("{blk}_validium_txs.json")))?;
 
         let version = Version::validium_v1();
+        let parent_header = read_parent_header(&base_dir, blk, version.fork)?;
         let witness = ChunkWitness::new_validium(
             version.as_version_byte(),
             &[block_witness],
@@ -75,7 +76,7 @@ fn test_execute_validium() -> eyre::Result<()> {
             version.fork,
             vec![validium_txs],
             secret_key.clone(),
-            None,
+            parent_header,
         );
 
         exec_chunk(&witness)?;
@@ -96,7 +97,10 @@ fn test_autofill_trie_nodes() -> eyre::Result<()> {
         &template_wit.blocks,
         template_wit.prev_msg_queue_hash,
         template_wit.fork_name,
-        template_wit.parent_header.clone(),
+        template_wit
+            .parent_header
+            .clone()
+            .expect("the witness builder supplies a parent"),
     );
     for index in [10, 13] {
         println!(

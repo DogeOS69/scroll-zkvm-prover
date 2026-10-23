@@ -28,7 +28,7 @@ fn witness(parent: Header, blocks: &[BlockWitness]) -> ChunkWitness {
         blocks,
         B256::ZERO,
         ForkName::Tsuki,
-        Some(parent),
+        parent,
     )
 }
 

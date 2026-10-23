@@ -84,6 +84,11 @@ test-chunk-witness-checks:
 	@if command -v sha256sum >/dev/null 2>&1; then cd crates/integration/testdata/tsuki-base-fee && sha256sum -c SHA256SUMS; else cd crates/integration/testdata/tsuki-base-fee && shasum -a 256 -c SHA256SUMS; fi
 	@cargo test -p scroll-zkvm-types-chunk --features scroll,host --test compression_infos --test validium_inputs --test header_validation --test endpoints
 
+.PHONY: test-parent-header-callers
+test-parent-header-callers:
+	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --lib testers::chunk::tests
+	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --bin chunk-scanner
+
 test-execute-validium-chunk:
 	@cargo test --release -p scroll-zkvm-integration --test chunk_circuit test_execute_validium -- --exact --nocapture
 
