@@ -68,12 +68,12 @@ openvm-transpiler = { git = "https://github.com/openvm-org/openvm.git", tag = "v
 # more openvm related libs
 openvm-stark-sdk = { git = "https://github.com/openvm-org/stark-backend.git", tag = "v1.4.0", default-features = false }
 
-# Native guest chain specs included in the tsuki-v0.9 release.
-sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.9" }
-sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.9", features = ["dev"] }
-sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.9" }
-sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.9" }
-sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.9" }
+# Native guest chain specs included in the tsuki-v0.10 release.
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.10" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.10", features = ["dev"] }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.10" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.10" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", tag = "tsuki-v0.10" }
 
 alloy-consensus = "=1.8.2"
 alloy-provider = "=1.8.2"
