@@ -35,6 +35,11 @@ on:
       - crates/circuits/bundle-circuit/**/*
       - crates/build-guest/**/*
   workflow_dispatch:
+    inputs:
+      export_artifacts:
+        description: 'Export exact b56e2274 guest programs for PR1680'
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -43,16 +48,45 @@ concurrency:
 jobs:
   docker-build-guest:
     name: Docker containerized build of guest programs
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false || (github.event_name == 'workflow_dispatch' && inputs.export_artifacts)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ inputs.export_artifacts && 'b56e2274af2830a6028a286f8f89a8fa0ccf60fe' || github.sha }}
 
       - name: Build guest and check diff
         run: |
           make build-guest     
           git diff
           git diff --quiet && echo "no diff" || (echo "diff"; exit 1)
+
+      - name: Prepare guest artifact export
+        if: github.event_name == 'workflow_dispatch' && inputs.export_artifacts
+        env:
+          WORKFLOW_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'b56e2274af2830a6028a286f8f89a8fa0ccf60fe'
+          dev=releases/dev
+          git rev-parse HEAD > "$dev/producer-source-sha.txt"
+          printf '%s\n' "$WORKFLOW_SOURCE_SHA" > "$dev/workflow-source-sha.txt"
+          sha256sum Cargo.lock > "$dev/producer-cargo-lock.sha256"
+          checksums="$(mktemp "$RUNNER_TEMP/pr1680-guest-checksums.XXXXXX")"
+          (
+            cd "$dev"
+            find . -type f ! -name sha256sums.txt -exec sha256sum {} \;
+          ) > "$checksums"
+          mv "$checksums" "$dev/sha256sums.txt"
+
+      - name: Upload guest programs
+        if: github.event_name == 'workflow_dispatch' && inputs.export_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr1680-guest-programs-b56e2274-${{ github.run_id }}-${{ github.run_attempt }}
+          path: releases/dev/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
