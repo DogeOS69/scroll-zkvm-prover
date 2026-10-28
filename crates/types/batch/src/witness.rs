@@ -171,7 +171,7 @@ impl From<&BatchWitness> for BatchInfo {
 
 #[cfg(test)]
 mod tests {
-    use types_base::version::{VALIDIUM_V1, Version};
+    use types_base::version::{SCROLL_GALILEO, SCROLL_GALILEO_V2, VALIDIUM_V1, Version};
 
     use super::*;
     use crate::header::{
@@ -182,6 +182,8 @@ mod tests {
 
     const TSUKI: u8 = Version::tsuki().as_version_byte();
     const EUCLID_V1: u8 = Version::euclid_v1().as_version_byte();
+    const EUCLID_V2: u8 = Version::euclid_v2().as_version_byte();
+    const FEYNMAN: u8 = Version::feynman().as_version_byte();
 
     fn witness(version: u8, reference_header: ReferenceHeader) -> BatchWitness {
         BatchWitness {
@@ -253,5 +255,54 @@ mod tests {
     #[should_panic(expected = "point_eval_witness missing for header::v7")]
     fn tsuki_version_accepts_v7_header() {
         let _ = BatchInfo::from(&witness(TSUKI, v7_header(TSUKI)));
+    }
+
+    #[test]
+    #[should_panic(expected = "point_eval_witness missing for header::v7")]
+    fn euclid_v2_version_accepts_v7_header() {
+        let _ = BatchInfo::from(&witness(EUCLID_V2, v7_header(EUCLID_V2)));
+    }
+
+    #[test]
+    #[should_panic(expected = "point_eval_witness missing for header::v7")]
+    fn feynman_version_accepts_v7_header() {
+        let _ = BatchInfo::from(&witness(FEYNMAN, v7_header(FEYNMAN)));
+    }
+
+    #[test]
+    #[should_panic(expected = "point_eval_witness missing for header::v7")]
+    fn galileo_version_accepts_v7_header() {
+        let _ = BatchInfo::from(&witness(SCROLL_GALILEO, v7_header(SCROLL_GALILEO)));
+    }
+
+    #[test]
+    #[should_panic(expected = "point_eval_witness missing for header::v7")]
+    fn galileo_v2_version_accepts_v7_header() {
+        let _ = BatchInfo::from(&witness(SCROLL_GALILEO_V2, v7_header(SCROLL_GALILEO_V2)));
+    }
+
+    /// The Validium builder checks the header's STF version and then requires at least one
+    /// chunk, so reaching the chunk check shows the Validium version selected the Validium
+    /// header and passed it to the Validium builder.
+    #[test]
+    #[should_panic(expected = "at least one chunk in batch")]
+    fn validium_version_accepts_validium_header() {
+        let stf_version = Version::validium_v1().stf_version as u8;
+        let _ = BatchInfo::from(&witness(VALIDIUM_V1, validium_header(stf_version)));
+    }
+
+    #[test]
+    #[should_panic(expected = "reference header does not match version")]
+    fn validium_version_rejects_v6_header() {
+        let _ = BatchInfo::from(&witness(VALIDIUM_V1, v6_header(EUCLID_V1)));
+    }
+
+    #[test]
+    #[should_panic(expected = "reference header does not match version")]
+    fn galileo_v2_version_rejects_validium_header() {
+        let _ = BatchInfo::from(&witness(
+            SCROLL_GALILEO_V2,
+            validium_header(SCROLL_GALILEO_V2),
+        ));
     }
 }
