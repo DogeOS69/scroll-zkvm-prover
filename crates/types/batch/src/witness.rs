@@ -5,6 +5,7 @@ use types_base::{
         ForkName,
         scroll::{batch::BatchInfo, chunk::ChunkInfo},
     },
+    version::{Codec, Domain, Version},
 };
 
 use crate::{
@@ -125,8 +126,11 @@ impl From<&BatchWitness> for BatchInfo {
     fn from(witness: &BatchWitness) -> Self {
         let chunk_infos = witness.chunk_infos.to_vec();
 
-        match &witness.reference_header {
-            ReferenceHeader::V6(header) => {
+        // The reference header variant is derived from the committed version byte rather than
+        // taken from the witness, so a header of the wrong codec or domain is rejected.
+        let version = Version::from(witness.version);
+        match (version.domain, version.codec, &witness.reference_header) {
+            (Domain::Scroll, Codec::V6, ReferenceHeader::V6(header)) => {
                 let args = BuilderArgsV6 {
                     header: *header,
                     chunk_infos,
@@ -135,7 +139,7 @@ impl From<&BatchWitness> for BatchInfo {
                 };
                 BatchInfoBuilderV6::build(witness.version, args)
             }
-            ReferenceHeader::V7_V8_V9_V10(header) => {
+            (Domain::Scroll, Codec::V7, ReferenceHeader::V7_V8_V9_V10(header)) => {
                 let point_eval_witness = witness
                     .point_eval_witness
                     .as_ref()
@@ -148,12 +152,106 @@ impl From<&BatchWitness> for BatchInfo {
                 };
                 BatchInfoBuilderV7::build(witness.version, args)
             }
-            ReferenceHeader::V8(_) => {
+            (_, _, ReferenceHeader::V8(_)) => {
                 unreachable!("Unexpected ReferenceHeader::V8 from 0.7.0 onwards");
             }
-            ReferenceHeader::Validium(header) => ValidiumBatchInfoBuilder::build(
-                ValidiumBuilderArgs::new(witness.version, *header, chunk_infos),
+            (Domain::Validium, _, ReferenceHeader::Validium(header)) => {
+                ValidiumBatchInfoBuilder::build(ValidiumBuilderArgs::new(
+                    witness.version,
+                    *header,
+                    chunk_infos,
+                ))
+            }
+            (domain, codec, _) => panic!(
+                "reference header does not match version: domain={domain:?}, codec={codec:?}"
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use types_base::version::{VALIDIUM_V1, Version};
+
+    use super::*;
+    use crate::header::{
+        v6::BatchHeaderV6,
+        v7::BatchHeaderV7,
+        validium::{BatchHeaderValidium, BatchHeaderValidiumV1},
+    };
+
+    const TSUKI: u8 = Version::tsuki().as_version_byte();
+    const EUCLID_V1: u8 = Version::euclid_v1().as_version_byte();
+
+    fn witness(version: u8, reference_header: ReferenceHeader) -> BatchWitness {
+        BatchWitness {
+            version,
+            chunk_proofs: vec![],
+            chunk_infos: vec![],
+            blob_bytes: vec![],
+            point_eval_witness: None,
+            reference_header,
+            fork_name: ForkName::Tsuki,
+        }
+    }
+
+    fn v6_header(version: u8) -> ReferenceHeader {
+        ReferenceHeader::V6(BatchHeaderV6 {
+            version,
+            ..Default::default()
+        })
+    }
+
+    fn v7_header(version: u8) -> ReferenceHeader {
+        ReferenceHeader::V7_V8_V9_V10(BatchHeaderV7 {
+            version,
+            ..Default::default()
+        })
+    }
+
+    fn validium_header(version: u8) -> ReferenceHeader {
+        ReferenceHeader::Validium(BatchHeaderValidium::V1(BatchHeaderValidiumV1 {
+            version,
+            ..Default::default()
+        }))
+    }
+
+    #[test]
+    #[should_panic(expected = "reference header does not match version")]
+    fn tsuki_version_rejects_v6_header() {
+        let _ = BatchInfo::from(&witness(TSUKI, v6_header(TSUKI)));
+    }
+
+    #[test]
+    #[should_panic(expected = "reference header does not match version")]
+    fn tsuki_version_rejects_validium_header() {
+        let _ = BatchInfo::from(&witness(TSUKI, validium_header(TSUKI)));
+    }
+
+    #[test]
+    #[should_panic(expected = "Unexpected ReferenceHeader::V8")]
+    fn tsuki_version_rejects_v8_header() {
+        let header = v7_header(TSUKI).into_v8_feynman();
+        let _ = BatchInfo::from(&witness(TSUKI, header));
+    }
+
+    #[test]
+    #[should_panic(expected = "reference header does not match version")]
+    fn validium_version_rejects_v7_header() {
+        let _ = BatchInfo::from(&witness(VALIDIUM_V1, v7_header(TSUKI)));
+    }
+
+    #[test]
+    #[should_panic(expected = "reference header does not match version")]
+    fn v6_version_rejects_v7_header() {
+        let _ = BatchInfo::from(&witness(EUCLID_V1, v7_header(EUCLID_V1)));
+    }
+
+    /// The V7 arm is the only one that requires a point-evaluation witness, so reaching that
+    /// check shows the Tsuki version selected the V7 header and passed it to the V7 builder.
+    #[test]
+    #[should_panic(expected = "point_eval_witness missing for header::v7")]
+    fn tsuki_version_accepts_v7_header() {
+        let _ = BatchInfo::from(&witness(TSUKI, v7_header(TSUKI)));
     }
 }

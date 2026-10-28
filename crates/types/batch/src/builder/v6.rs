@@ -1,5 +1,8 @@
 use alloy_primitives::B256;
-use types_base::public_inputs::scroll::batch::BatchInfo;
+use types_base::{
+    public_inputs::scroll::batch::BatchInfo,
+    version::{Codec, Version},
+};
 
 use crate::{
     BatchHeader, PayloadV6,
@@ -15,9 +18,22 @@ impl super::BatchInfoBuilder for BatchInfoBuilderV6 {
     type Payload = PayloadV6;
 
     fn build(
-        _version: u8,
+        version: u8,
         args: super::BuilderArgs<<Self::Payload as crate::payload::Payload>::BatchHeader>,
     ) -> BatchInfo {
+        // Validate the version against the codec and the batch header.
+        let version = Version::from(version);
+        assert!(
+            matches!(version.codec, Codec::V6),
+            "codec mismatch: expected V6, got(witness)={:?}",
+            version.codec,
+        );
+        assert_eq!(
+            args.header.version, version.stf_version as u8,
+            "batch header version mismatch: expected(witness)={:?}, got(onchain)={:?}",
+            version.stf_version as u8, args.header.version,
+        );
+
         // Construct the batch payload using blob bytes.
         let envelope = <<Self::Payload as Payload>::Envelope as Envelope>::from_slice(
             args.blob_bytes.as_slice(),
@@ -56,5 +72,43 @@ impl super::BatchInfoBuilder for BatchInfoBuilderV6 {
             post_msg_queue_hash: Default::default(),
             encryption_key: Default::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use types_base::version::Version;
+
+    use super::*;
+    use crate::{
+        BatchHeaderV6,
+        builder::{BatchInfoBuilder, BuilderArgsV6},
+    };
+
+    const TSUKI: u8 = Version::tsuki().as_version_byte();
+    const EUCLID_V1: u8 = Version::euclid_v1().as_version_byte();
+
+    fn args(header_version: u8) -> BuilderArgsV6 {
+        BuilderArgsV6 {
+            header: BatchHeaderV6 {
+                version: header_version,
+                ..Default::default()
+            },
+            chunk_infos: vec![],
+            blob_bytes: vec![],
+            point_eval_witness: None,
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "codec mismatch: expected V6")]
+    fn rejects_tsuki_version() {
+        let _ = BatchInfoBuilderV6::build(TSUKI, args(TSUKI));
+    }
+
+    #[test]
+    #[should_panic(expected = "batch header version mismatch")]
+    fn rejects_header_version_mismatch() {
+        let _ = BatchInfoBuilderV6::build(EUCLID_V1, args(TSUKI));
     }
 }
