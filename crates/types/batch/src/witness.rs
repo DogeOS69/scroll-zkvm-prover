@@ -305,4 +305,12 @@ mod tests {
             validium_header(SCROLL_GALILEO_V2),
         ));
     }
+
+    /// Both V6 version asserts pass, so the V6 builder goes on to read the first blob byte,
+    /// which the empty test blob does not have.
+    #[test]
+    #[should_panic(expected = "the len is 0 but the index is 0")]
+    fn euclid_v1_version_accepts_v6_header() {
+        let _ = BatchInfo::from(&witness(EUCLID_V1, v6_header(EUCLID_V1)));
+    }
 }
