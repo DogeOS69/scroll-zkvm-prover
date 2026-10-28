@@ -12,6 +12,7 @@ on:
       - Dockerfile
       - build-guest.sh
       - crates/circuits/types/**/*
+      - crates/types/**/*
       - crates/circuits/chunk-circuit/**/*
       - crates/circuits/batch-circuit/**/*
       - crates/circuits/bundle-circuit/**/*
@@ -30,6 +31,7 @@ on:
       - Dockerfile
       - build-guest.sh
       - crates/circuits/types/**/*
+      - crates/types/**/*
       - crates/circuits/chunk-circuit/**/*
       - crates/circuits/batch-circuit/**/*
       - crates/circuits/bundle-circuit/**/*
