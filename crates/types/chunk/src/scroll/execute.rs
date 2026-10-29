@@ -49,7 +49,10 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         ForkName::Feynman => Hardfork::Feynman,
         ForkName::Galileo => Hardfork::Galileo,
         ForkName::GalileoV2 => Hardfork::GalileoV2,
-        ForkName::Tsuki => Hardfork::Tsuki,
+        // TsukiV2 keeps the Tsuki version byte (11) and public-input layout, but the
+        // rebuilt guest proves only TsukiV2 execution rules. The host must reject
+        // chunks that start before the chain's tsukiV2Time before requesting a proof.
+        ForkName::Tsuki => Hardfork::TsukiV2,
     };
 
     // SBV validates every chunk against its parent, including pre-Tsuki chunks whose public
