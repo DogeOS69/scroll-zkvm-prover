@@ -58,3 +58,23 @@ jobs:
           make build-guest     
           git diff
           git diff --quiet && echo "no diff" || (echo "diff"; exit 1)
+
+      - name: Record guest build provenance
+        if: always()
+        run: |
+          git rev-parse HEAD > guest-build-source.txt
+          git diff --binary > guest-build.diff
+          sha256sum Cargo.lock rust-toolchain.toml Dockerfile > guest-build-inputs.sha256
+
+      - name: Upload guest programs and generated commitments
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: guest-build-${{ github.sha }}
+          path: |
+            releases/dev/
+            guest-build-source.txt
+            guest-build.diff
+            guest-build-inputs.sha256
+          if-no-files-found: error
+          retention-days: 14
