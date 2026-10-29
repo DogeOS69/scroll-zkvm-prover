@@ -70,11 +70,11 @@ openvm-stark-sdk = { git = "https://github.com/openvm-org/stark-backend.git", ta
 
 # Integration pin for TsukiV2 (SBV #29). Before release, re-pin after #29 and #30
 # are merged, then rebuild the guest programs against that final revision.
-sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c011f2a335288b062a17838ce611a64d33b723b2" }
-sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c011f2a335288b062a17838ce611a64d33b723b2", features = ["dev"] }
-sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c011f2a335288b062a17838ce611a64d33b723b2" }
-sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c011f2a335288b062a17838ce611a64d33b723b2" }
-sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "c011f2a335288b062a17838ce611a64d33b723b2" }
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d9d07c0a9b012d0d58d1d7c6e6df56f7350b4223" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d9d07c0a9b012d0d58d1d7c6e6df56f7350b4223", features = ["dev"] }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d9d07c0a9b012d0d58d1d7c6e6df56f7350b4223" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d9d07c0a9b012d0d58d1d7c6e6df56f7350b4223" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "d9d07c0a9b012d0d58d1d7c6e6df56f7350b4223" }
 
 alloy-consensus = "=1.8.2"
 alloy-provider = "=1.8.2"
