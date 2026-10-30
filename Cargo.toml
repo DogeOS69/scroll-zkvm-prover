@@ -165,3 +165,6 @@ strip = false
 
 [profile.bench]
 inherits = "profiling"
+
+[patch."https://github.com/DogeOS69/dogeos-revm.git"]
+revm-scroll = { path = "benchmark-revm" }

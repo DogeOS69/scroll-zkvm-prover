@@ -4,6 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates=20250419~deb12u2 \
     && rm -rf /var/lib/apt/lists/*
 
+ENV CARGO_BUILD_JOBS=8 RAYON_NUM_THREADS=8
+
 WORKDIR /app
 
 ARG OPENVM_RUST_TOOLCHAIN=nightly-2026-03-17

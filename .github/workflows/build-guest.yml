@@ -45,19 +45,33 @@ concurrency:
 jobs:
   docker-build-guest:
     name: Docker containerized build of guest programs
-    if: github.event.pull_request.draft == false
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 80
+    env:
+      BUILD_PROJECT: chunk
+      CARGO_BUILD_JOBS: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
+      - name: Check out the benchmarked execution change
+        uses: actions/checkout@v4
+        with:
+          repository: DogeOS69/dogeos-revm
+          ref: 44b8bf4471595e59a954190f9aab175c43546b59
+          path: benchmark-revm
+          persist-credentials: false
+
       - name: Build guest and check diff
         run: |
-          make build-guest     
+          git -C benchmark-revm diff --exit-code
+          git -C benchmark-revm rev-parse HEAD > guest-build-revm-source.txt
+          make build-guest
           git diff
-          git diff --quiet && echo "no diff" || (echo "diff"; exit 1)
+          git diff --exit-code -- Cargo.toml Cargo.lock rust-toolchain.toml Dockerfile
 
       - name: Record guest build provenance
         if: always()
@@ -74,6 +88,7 @@ jobs:
           path: |
             releases/dev/
             guest-build-source.txt
+            guest-build-revm-source.txt
             guest-build.diff
             guest-build-inputs.sha256
           if-no-files-found: error
