@@ -65,8 +65,8 @@ impl UniversalVerifier {
         Self::verify_stark_proof_with_vk(&self.loaded_agg_vk, stark_proof, vk)
     }
 
-    /// Not used by DogeOS and must not be relied on: the EVM check runs on a mainnet-spec EVM
-    /// with an unbounded gas limit. See [`crate::evm`].
+    /// Not used by DogeOS and must not be relied on: the EVM check runs on an Ethereum EVM, not
+    /// DogeOS chain rules. See [`crate::evm`].
     pub fn verify_evm_proof(&self, evm_proof: &OpenVmEvmProof, vk: &[u8]) -> eyre::Result<()> {
         let prog_commit = serialize_vk::deserialize(vk);
 
