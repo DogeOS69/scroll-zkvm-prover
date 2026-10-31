@@ -38,10 +38,16 @@ const VERSIONED_HASH_VERSION_KZG: u8 = 1;
 ///
 /// We use [`openvm_pairing_guest`] extension to implement this in guest program.
 pub fn verify_kzg_proof(z: Scalar, y: Scalar, commitment: G1Affine, proof: G1Affine) -> bool {
+    // SAFETY: `from_xy_nonidentity` checks the curve equation and rejects the identity (the
+    // `expect`), but does not check subgroup membership. The caller (`builder::v7`) passes points
+    // from `build_point`, which parses canonical coordinates, checks the curve equation and
+    // requires G1 subgroup membership. The point only feeds the pairing check below.
     let proof_q = unsafe {
         G1Affine::from_xy_nonidentity(proof.x().clone(), proof.y().clone())
             .expect("kzg proof not G1 identity")
     };
+    // SAFETY: as for `proof_q`: on-curve and non-identity are checked here, subgroup membership
+    // comes from `build_point` in the caller.
     let p_minus_y = unsafe {
         G1Affine::from_xy_nonidentity(commitment.x().clone(), commitment.y().clone())
             .expect("kzg commitment not G1 identity")
