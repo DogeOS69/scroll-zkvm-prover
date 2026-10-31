@@ -76,6 +76,9 @@ pub fn build_intrinsic_point(
     use openvm_pairing::bls12_381::{Fp, G1Affine};
     let x = Fp::from_be_bytes(&x)?;
     let y = Fp::from_be_bytes(&y)?;
+    // SAFETY: `from_be_bytes` rejects non-canonical coordinates and `from_xy` checks the curve
+    // equation. It does not check subgroup membership, so the point is returned only after
+    // `is_in_g1_subgroup`.
     let p = unsafe { G1Affine::from_xy(x, y) }?;
     is_in_g1_subgroup(&p).then_some(p)
 }
