@@ -1,3 +1,11 @@
+//! Off-chain simulation of the upstream EVM (SNARK) verifier contract.
+//!
+//! Not used by DogeOS and must not be relied on. DogeOS verifies STARK proofs only and deploys
+//! no EVM verifier contract. [`verify_evm_proof`] runs on a mainnet-spec EVM
+//! (`Context::mainnet()`) with an unbounded transaction gas limit (`u64::MAX`), so it does not
+//! model DogeOS chain rules or the transaction gas cap: a proof that passes here could still
+//! fail on a real chain. It is kept only for the upstream integration tests.
+
 use openvm_native_recursion::halo2::RawEvmProof;
 use openvm_sdk::types::EvmProof;
 use revm::{
@@ -42,6 +50,8 @@ pub fn deserialize_vk<C: Circuit<Fr, Params = ()>>(raw_vk: &[u8]) -> VerifyingKe
 /// This approach essentially simulates 2 txs:
 /// - Deploy [`EvmVerifier`].
 /// - Verify [`EvmProof`] encoded as calldata.
+///
+/// Not used by DogeOS; see the module docs for why the result must not be relied on.
 pub fn verify_evm_proof(evm_verifier: &[u8], evm_proof: &EvmProof) -> Result<u64, String> {
     let evm_proof: RawEvmProof = evm_proof
         .clone()

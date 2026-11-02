@@ -31,7 +31,7 @@ pub use openvm_sdk::{self};
 use crate::setup::read_app_exe;
 use crate::{Error, setup::read_app_config, task::ProvingTask};
 
-use scroll_zkvm_types::proof::{EvmProof, ProofEnum, StarkProof, StarkProofStat};
+use scroll_zkvm_types::proof::{ProofEnum, StarkProof, StarkProofStat};
 
 /// Generic prover.
 pub struct Prover {
@@ -169,8 +169,11 @@ impl Prover {
         scroll_zkvm_verifier::evm::serialize_vk(sdk.halo2_pk().wrapper.pinning.pk.get_vk())
     }
 
-    /// Simple wrapper of gen_proof_stark/snark, Early-return if a proof is found in disc,
-    /// otherwise generate and return the proof after writing to disc.
+    /// Generate and verify a STARK proof for the task.
+    ///
+    /// SNARK/EVM proofs are not supported in this fork: `with_snark = true` returns an error
+    /// before any proving work, so this never returns an unverified proof. The flag is kept
+    /// only so existing callers, which all pass `false`, keep compiling.
     #[instrument("Prover::gen_proof_universal", skip_all, fields(task_id))]
     pub fn gen_proof_universal(
         &mut self,
@@ -178,19 +181,20 @@ impl Prover {
         with_snark: bool,
     ) -> Result<ProofEnum, Error> {
         let task_id = task.identifier();
+        if with_snark {
+            return Err(Error::GenProof(
+                "SNARK/EVM proofs are not supported in this fork; call with with_snark = false"
+                    .to_string(),
+            ));
+        }
         tracing::debug!(name: "generate_root_verifier_input", task_id);
 
         let stdin = task.build_guest_input();
 
-        // Generate a new proof.
-        let proof = if !with_snark {
-            self.gen_proof_stark(stdin)?.into()
-        } else {
-            EvmProof::from(self.gen_proof_snark(stdin)?).into()
-        };
+        let proof = self.gen_proof_stark(stdin)?.into();
 
         tracing::info!(
-            "app proof generated for {}, task id {task_id}, isevm {with_snark}",
+            "app proof generated for {}, task id {task_id}",
             self.prover_name
         );
         Ok(proof)
@@ -277,6 +281,10 @@ impl Prover {
     }
 
     /// Generate an [evm proof][evm_proof].
+    ///
+    /// Not used by DogeOS and not supported in this fork. The returned proof is NOT verified;
+    /// it is kept only for the upstream integration tests (the bundle e2e tests verify it
+    /// separately).
     ///
     /// [evm_proof][openvm_native_recursion::halo2::EvmProof]
     pub fn gen_proof_snark(&mut self, stdin: StdIn) -> Result<OpenVmEvmProof, Error> {

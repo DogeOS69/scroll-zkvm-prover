@@ -125,49 +125,9 @@ let verifier = prover.dump_universal_verifier(None::<String>);
 assert!(verifier.verify_proof(proof.as_root_proof().expect("should be root proof"), &vk)?);
 ```
 
-### To prove a universal task with SNARK proofs
+### SNARK/EVM proofs
 
-Prover capable of generating SNARK proofs aggregating the root proof for a Scroll [universal task](TODO:doc):
-
-```rust
-use std::path::Path;
-
-use scroll_zkvm_prover::{
-    Prover,
-    task::ProvingTask,
-};
-use scroll_zkvm_types::{
-    public_inputs::ForkName,
-    chunk::ChunkWitness,
-    task::ProvingTask as UniversalProvingTask,
-};
-
-// Paths to the application exe and application config.
-let path_exe = Path::new("./path/to/app.vmexe");
-let path_app_config = Path::new("./path/to/openvm.toml");
-
-// Optional directory to cache generated proofs on disk.
-let cache_dir = Path::new("./path/to/cache/proofs");
-
-let config = scroll_zkvm_prover::ProverConfig {
-    path_app_exe,
-    path_app_config,
-    dir_cache: Some(cache_dir),
-    ..Default::default()
-};
-// Setup prover capable to generate SNARK proof.
-let prover = Prover::setup(config, true, None)?;
-
-let vk = prover.get_app_vk();
-let task : UniversalProvingTask = /* a universal task, commonly generated and assigned by coordinator */
-
-// Generate a SNARK proof.
-let proof = prover.gen_proof_universal(&task, true)?;
-
-// Verify proof.
-let verifier = prover.dump_universal_verifier(None::<String>);
-assert!(verifier.verify_proof_evm(&proof.clone().into_evm_proof().expect("should be evm proof").into(), &vk)?);
-```
+SNARK/EVM proofs are not supported in this fork. `gen_proof_universal(&task, true)` returns an error, and the EVM verifier simulation in `scroll-zkvm-verifier` (`evm.rs`) is not used by DogeOS and must not be relied on. DogeOS proves and verifies STARK proofs only.
 
 ### Form a universal task for a chunk from block witnesses
 

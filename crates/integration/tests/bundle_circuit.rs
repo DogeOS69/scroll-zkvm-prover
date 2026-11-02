@@ -78,7 +78,8 @@ fn setup_prove_verify_local_task() -> eyre::Result<()> {
     let u_task = load_local_task("bundle-task.json")?;
     let mut prover = BundleProverTester::load_prover(true)?;
 
-    let _ = prover.gen_proof_universal(&u_task, true)?;
+    // `gen_proof_universal` rejects SNARK proofs, so drive the SNARK prover directly.
+    let _ = prover.prove_task(&u_task, true)?;
 
     Ok(())
 }
