@@ -1,18 +1,18 @@
 //! Off-chain simulation of the upstream EVM (SNARK) verifier contract.
 //!
 //! Not used by DogeOS and must not be relied on. DogeOS verifies STARK proofs only and deploys
-//! no EVM verifier contract. [`verify_evm_proof`] runs on a mainnet-spec EVM
-//! (`Context::mainnet()`) with an unbounded transaction gas limit (`u64::MAX`), so it does not
-//! model DogeOS chain rules or the transaction gas cap: a proof that passes here could still
-//! fail on a real chain. It is kept only for the upstream integration tests.
+//! no EVM verifier contract. [`verify_evm_proof`] runs on an Ethereum EVM with an explicit
+//! spec ([`EVM_SPEC`]) and each transaction capped at the EIP-7825 limit ([`TX_GAS_LIMIT`]). It
+//! does not model DogeOS chain rules: a proof that passes here could still fail on a real chain.
+//! It is kept only for the upstream integration tests.
 
 use openvm_native_recursion::halo2::RawEvmProof;
 use openvm_sdk::types::EvmProof;
 use revm::{
     Context, ExecuteCommitEvm, MainBuilder, MainContext,
-    context::{TxEnv, result::ExecutionResult},
+    context::{CfgEnv, TxEnv, result::ExecutionResult},
     database::InMemoryDB,
-    primitives::TxKind,
+    primitives::{TxKind, eip7825::TX_GAS_LIMIT_CAP, hardfork::SpecId},
 };
 // Re-export from snark_verifier_sdk.
 pub use snark_verifier_sdk::{
@@ -24,6 +24,12 @@ pub use snark_verifier_sdk::{
         plonk::{Circuit, VerifyingKey},
     },
 };
+
+/// EVM spec the verifier contract is deployed and called under.
+pub const EVM_SPEC: SpecId = SpecId::OSAKA;
+
+/// Gas limit of each simulated transaction: the EIP-7825 per-transaction cap.
+pub const TX_GAS_LIMIT: u64 = TX_GAS_LIMIT_CAP;
 
 /// Serialize vk, code extracted from legacy prover.
 pub fn serialize_vk(vk: &VerifyingKey<G1Affine>) -> Vec<u8> {
@@ -63,12 +69,13 @@ pub fn verify_evm_proof(evm_verifier: &[u8], evm_proof: &EvmProof) -> Result<u64
 /// Deploy a contract and call it with calldata using the workspace REVM version.
 fn deploy_and_call(deployment_code: Vec<u8>, calldata: Vec<u8>) -> Result<u64, String> {
     let mut evm = Context::mainnet()
+        .with_cfg(CfgEnv::new_with_spec(EVM_SPEC))
         .with_db(InMemoryDB::default())
         .build_mainnet();
 
     let result = evm
         .transact_commit(TxEnv {
-            gas_limit: u64::MAX,
+            gas_limit: TX_GAS_LIMIT,
             kind: TxKind::Create,
             data: deployment_code.into(),
             ..Default::default()
@@ -96,7 +103,7 @@ fn deploy_and_call(deployment_code: Vec<u8>, calldata: Vec<u8>) -> Result<u64, S
 
     let result = evm
         .transact_commit(TxEnv {
-            gas_limit: u64::MAX,
+            gas_limit: TX_GAS_LIMIT,
             kind: TxKind::Call(contract),
             data: calldata.into(),
             nonce: 1,
@@ -140,4 +147,11 @@ fn test_verify_evm_proof() -> eyre::Result<()> {
     println!("evm-verify gas cost = {gas_cost}");
 
     Ok(())
+}
+
+#[test]
+fn test_deploy_and_call_within_tx_gas_cap() {
+    // Init code returning the one-byte runtime code `STOP`.
+    let deployment_code = revm::primitives::hex!("600060005360016000f3").to_vec();
+    deploy_and_call(deployment_code, vec![]).expect("deploy and call");
 }
