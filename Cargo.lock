@@ -2269,7 +2269,7 @@ dependencies = [
 [[package]]
 name = "dogeos-chainspec"
 version = "0.1.0"
-source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.12#23a1737cba530e419ec207ccec445eb52904d9f9"
+source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.13#1654dbe9cb08e30a193d8ead9b996e784ffea84d"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -2292,7 +2292,7 @@ dependencies = [
 [[package]]
 name = "dogeos-hardforks"
 version = "0.1.0"
-source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.12#23a1737cba530e419ec207ccec445eb52904d9f9"
+source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.13#1654dbe9cb08e30a193d8ead9b996e784ffea84d"
 dependencies = [
  "alloy-hardforks",
  "auto_impl",
@@ -2302,7 +2302,7 @@ dependencies = [
 [[package]]
 name = "dogeos-protocol-types"
 version = "0.1.0"
-source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.12#23a1737cba530e419ec207ccec445eb52904d9f9"
+source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.13#1654dbe9cb08e30a193d8ead9b996e784ffea84d"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2318,7 +2318,7 @@ dependencies = [
 [[package]]
 name = "dogeos-reth-consensus"
 version = "0.1.0"
-source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.12#23a1737cba530e419ec207ccec445eb52904d9f9"
+source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.13#1654dbe9cb08e30a193d8ead9b996e784ffea84d"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -2334,7 +2334,7 @@ dependencies = [
 [[package]]
 name = "dogeos-reth-evm"
 version = "0.1.0"
-source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.12#23a1737cba530e419ec207ccec445eb52904d9f9"
+source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.13#1654dbe9cb08e30a193d8ead9b996e784ffea84d"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2361,7 +2361,7 @@ dependencies = [
 [[package]]
 name = "dogeos-reth-primitives"
 version = "0.1.0"
-source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.12#23a1737cba530e419ec207ccec445eb52904d9f9"
+source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.13#1654dbe9cb08e30a193d8ead9b996e784ffea84d"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2379,7 +2379,7 @@ dependencies = [
 [[package]]
 name = "dogeos-rpc-types"
 version = "0.1.0"
-source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.12#23a1737cba530e419ec207ccec445eb52904d9f9"
+source = "git+https://github.com/DogeOS69/dogeos-reth.git?tag=tsuki-v0.13#1654dbe9cb08e30a193d8ead9b996e784ffea84d"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6422,7 +6422,7 @@ dependencies = [
 [[package]]
 name = "reth-chainspec"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -6472,7 +6472,7 @@ dependencies = [
 [[package]]
 name = "reth-consensus"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -6485,7 +6485,7 @@ dependencies = [
 [[package]]
 name = "reth-consensus-common"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6498,7 +6498,7 @@ dependencies = [
 [[package]]
 name = "reth-db-models"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -6511,7 +6511,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-forks"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-eip2124",
  "alloy-hardforks",
@@ -6524,7 +6524,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-primitives"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6538,7 +6538,7 @@ dependencies = [
 [[package]]
 name = "reth-evm"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6560,7 +6560,7 @@ dependencies = [
 [[package]]
 name = "reth-execution-errors"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-evm",
  "alloy-primitives",
@@ -6573,7 +6573,7 @@ dependencies = [
 [[package]]
 name = "reth-execution-types"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6592,7 +6592,7 @@ dependencies = [
 [[package]]
 name = "reth-network-peers"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -6632,7 +6632,7 @@ dependencies = [
 [[package]]
 name = "reth-prune-types"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-primitives",
  "derive_more 2.0.1",
@@ -6646,7 +6646,7 @@ dependencies = [
 [[package]]
 name = "reth-stages-types"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-primitives",
  "bytes",
@@ -6658,7 +6658,7 @@ dependencies = [
 [[package]]
 name = "reth-static-file-types"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-primitives",
  "derive_more 2.0.1",
@@ -6672,7 +6672,7 @@ dependencies = [
 [[package]]
 name = "reth-storage-api"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6695,7 +6695,7 @@ dependencies = [
 [[package]]
 name = "reth-storage-errors"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -6713,7 +6713,7 @@ dependencies = [
 [[package]]
 name = "reth-trie-common"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.12#bb3122afa33df077840b7e303a84d9b0dc6841ef"
+source = "git+https://github.com/DogeOS69/reth.git?tag=tsuki-v0.13#09c6b809af6d7c2da35f48dd125924e8da793553"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -6923,7 +6923,7 @@ dependencies = [
 [[package]]
 name = "revm-scroll"
 version = "0.1.0"
-source = "git+https://github.com/DogeOS69/dogeos-revm.git?tag=tsuki-v0.12#4633937125b70088bb12a214356cddb24cde18d0"
+source = "git+https://github.com/DogeOS69/dogeos-revm.git?tag=tsuki-v0.13#516ff663b2fb2503dba8ef6b0d667f16334ac05a"
 dependencies = [
  "alloy-evm",
  "auto_impl",
@@ -7245,7 +7245,7 @@ dependencies = [
 [[package]]
 name = "sbv-core"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.12#be4f5d99587a0efdcd5704dea9999c566b45cdf5"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.13#a36a8de11071832e02e528ba2e2b6ffd4cf995a7"
 dependencies = [
  "alloy-rlp",
  "auto_impl",
@@ -7262,7 +7262,7 @@ dependencies = [
 [[package]]
 name = "sbv-helpers"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.12#be4f5d99587a0efdcd5704dea9999c566b45cdf5"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.13#a36a8de11071832e02e528ba2e2b6ffd4cf995a7"
 dependencies = [
  "tracing",
 ]
@@ -7270,7 +7270,7 @@ dependencies = [
 [[package]]
 name = "sbv-primitives"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.12#be4f5d99587a0efdcd5704dea9999c566b45cdf5"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.13#a36a8de11071832e02e528ba2e2b6ffd4cf995a7"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -7300,7 +7300,7 @@ dependencies = [
 [[package]]
 name = "sbv-trie"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.12#be4f5d99587a0efdcd5704dea9999c566b45cdf5"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.13#a36a8de11071832e02e528ba2e2b6ffd4cf995a7"
 dependencies = [
  "alloy-rlp",
  "alloy-trie 0.9.5",
@@ -7312,7 +7312,7 @@ dependencies = [
 [[package]]
 name = "sbv-utils"
 version = "2.0.0"
-source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.12#be4f5d99587a0efdcd5704dea9999c566b45cdf5"
+source = "git+https://github.com/DogeOS69/stateless-block-verifier?tag=tsuki-v0.13#a36a8de11071832e02e528ba2e2b6ffd4cf995a7"
 dependencies = [
  "alloy-provider",
  "alloy-transport",
