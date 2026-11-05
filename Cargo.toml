@@ -69,11 +69,11 @@ openvm-transpiler = { git = "https://github.com/openvm-org/openvm.git", tag = "v
 openvm-stark-sdk = { git = "https://github.com/openvm-org/stark-backend.git", tag = "v1.4.0", default-features = false }
 
 # Coordinated Tsuki v0.12 execution stack: SBV, dogeos-reth, Reth and DogeOS REVM.
-sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "a2895bd12fbac10830a9f585c99bf1e3df884bdf" }
-sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "a2895bd12fbac10830a9f585c99bf1e3df884bdf", features = ["dev"] }
-sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "a2895bd12fbac10830a9f585c99bf1e3df884bdf" }
-sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "a2895bd12fbac10830a9f585c99bf1e3df884bdf" }
-sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "a2895bd12fbac10830a9f585c99bf1e3df884bdf" }
+sbv-core = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "210725dc9963e70b5c2bbc00ed00e8f5f616b43d" }
+sbv-helpers = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "210725dc9963e70b5c2bbc00ed00e8f5f616b43d", features = ["dev"] }
+sbv-primitives = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "210725dc9963e70b5c2bbc00ed00e8f5f616b43d" }
+sbv-utils = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "210725dc9963e70b5c2bbc00ed00e8f5f616b43d" }
+sbv-trie = { git = "https://github.com/DogeOS69/stateless-block-verifier", rev = "210725dc9963e70b5c2bbc00ed00e8f5f616b43d" }
 
 alloy-consensus = "=1.8.2"
 alloy-provider = "=1.8.2"
