@@ -195,23 +195,6 @@ fn trusted_tsuki_config(chain: Chain) -> Result<(GuestChainConfig, u64), String>
     }
 }
 
-#[cfg(test)]
-mod config_tests {
-    use super::*;
-    use sbv_primitives::chainspec::{ForkCondition, Hardforks};
-
-    #[test]
-    fn mainnet_activates_at_zero_without_a_migration_checkpoint() {
-        let (config, timestamp) = trusted_tsuki_config(Chain::from_id(1_122_005)).unwrap();
-        assert_eq!(timestamp, 0);
-        assert_eq!(config.config.withdrawal_queue_checkpoint, None);
-        assert_eq!(
-            config.build_tsuki_at(timestamp).fork(Hardfork::TsukiV2),
-            ForkCondition::Timestamp(0)
-        );
-    }
-}
-
 /// The fork the chunk claims has to be the fork its version byte names.
 ///
 /// `fork_name` selects the endpoint semantics and base-fee rules, while `version` selects the
@@ -278,5 +261,22 @@ fn block_to_context(block: &RecoveredBlock<Block>) -> BlockContextV2 {
                 .count(),
         )
         .expect("num l1 msgs u16"),
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+    use sbv_primitives::chainspec::{ForkCondition, Hardforks};
+
+    #[test]
+    fn mainnet_activates_at_zero_without_a_migration_checkpoint() {
+        let (config, timestamp) = trusted_tsuki_config(Chain::from_id(1_122_005)).unwrap();
+        assert_eq!(timestamp, 0);
+        assert_eq!(config.config.withdrawal_queue_checkpoint, None);
+        assert_eq!(
+            config.build_tsuki_at(timestamp).fork(Hardfork::TsukiV2),
+            ForkCondition::Timestamp(0)
+        );
     }
 }
