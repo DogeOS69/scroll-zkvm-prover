@@ -75,6 +75,7 @@ test-tsuki-golden:
 
 .PHONY: test-batch-codec
 test-batch-codec:
+	@if command -v sha256sum >/dev/null 2>&1; then cd crates/integration/testdata/tsuki-dev && sha256sum -c SHA256SUMS; else cd crates/integration/testdata/tsuki-dev && shasum -a 256 -c SHA256SUMS; fi
 # Fail if multiple encoder sources make the package specification ambiguous.
 	@cargo tree --locked -p scroll-zkvm-integration --invert encoder-standard >/dev/null
 	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --lib utils::test_build_and_parse_batch_task -- --exact

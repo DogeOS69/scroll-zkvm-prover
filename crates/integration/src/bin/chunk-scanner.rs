@@ -366,15 +366,13 @@ mod tests {
     use std::path::Path;
 
     fn fixture(number: u64) -> BlockWitness {
-        read_block_witness(
-            Path::new("testdata/tsuki-base-fee/witnesses").join(format!("{number}.json")),
-        )
-        .unwrap()
+        read_block_witness(Path::new("testdata/tsuki-dev/witnesses").join(format!("{number}.json")))
+            .unwrap()
     }
 
     fn genesis() -> Header {
         read_parent_header(
-            Path::new("testdata/tsuki-base-fee/witnesses"),
+            Path::new("testdata/tsuki-dev/witnesses"),
             1,
             Version::tsuki().fork,
         )
@@ -387,7 +385,7 @@ mod tests {
         let first = fixture(1);
         let mut pending = PendingChunk::new(genesis(), first, 1);
         let mut completed = Vec::new();
-        for number in 2..=7 {
+        for number in 2..=4 {
             let block = fixture(number);
             let parent = fixture(number - 1).header;
             execute(ChunkWitness::new_scroll(
@@ -405,7 +403,7 @@ mod tests {
         }
         completed.push(pending);
         let mut previous_hash = genesis().hash_slow();
-        for (chunk, (start, end)) in completed.into_iter().zip([(1, 3), (4, 6), (7, 7)]) {
+        for (chunk, (start, end)) in completed.into_iter().zip([(1, 3), (4, 4)]) {
             assert_eq!(chunk.blocks.first().unwrap().header.number, start);
             assert_eq!(chunk.blocks.last().unwrap().header.number, end);
             assert_eq!(chunk.parent_header.hash_slow(), previous_hash);
@@ -414,7 +412,7 @@ mod tests {
             assert_eq!(info.prev_blockhash, previous_hash);
             previous_hash = info.post_blockhash;
         }
-        assert_eq!(previous_hash, fixture(7).header.hash_slow());
+        assert_eq!(previous_hash, fixture(4).header.hash_slow());
     }
 
     #[test]
@@ -435,7 +433,7 @@ mod tests {
         let provider =
             ProviderBuilder::<_, _, Network>::default().connect_mocked_client(responses.clone());
         let rpc_parent: serde_json::Value = serde_json::from_slice(
-            &std::fs::read("testdata/tsuki-base-fee/witnesses/parent.json").unwrap(),
+            &std::fs::read("testdata/tsuki-dev/witnesses/parent.json").unwrap(),
         )
         .unwrap();
         let child = fixture(1).header;

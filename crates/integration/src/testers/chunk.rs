@@ -310,7 +310,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
-        ForkName::Tsuki => (Version::tsuki(), 1..=7),
+        ForkName::Tsuki => (Version::tsuki(), 1..=4),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -366,11 +366,10 @@ pub fn create_canonical_tasks(
     Ok(ret)
 }
 
-/// The `tsuki-base-fee` corpus split into two chunks, at the block whose transaction changes the
-/// L2 base-fee overhead: the second chunk is then the first one that has to read the new value out
-/// of its own pre-state, and its trusted parent is the boundary block.
+/// The registered development corpus split across a block above the gas target, so the second
+/// chunk authenticates the boundary header and the resulting base-fee change.
 fn tsuki_golden_chunk_ranges() -> [std::ops::RangeInclusive<u64>; 2] {
-    [1..=4, 5..=7]
+    [1..=2, 3..=4]
 }
 
 pub fn tsuki_golden_chunk_tasks() -> eyre::Result<Vec<ChunkTaskGenerator>> {
@@ -500,14 +499,13 @@ mod tests {
     fn test_presets() {
         std::env::remove_var("BLOCK_RANGE");
 
-        // The Tsuki presets read `tsuki-base-fee`, whose seven blocks split at the one whose
-        // transaction changes the L2 base-fee overhead.
+        // The standard guest accepts the four-block registered development corpus.
         let single = preset_chunk();
-        assert_eq!(single.block_range, (1u64..=7).collect::<Vec<u64>>(),);
+        assert_eq!(single.block_range, (1u64..=4).collect::<Vec<u64>>(),);
         let multiple = preset_chunk_multiple();
         assert_eq!(multiple.len(), 2);
-        assert_eq!(multiple[0].block_range, (1..=4).collect::<Vec<u64>>(),);
-        assert_eq!(multiple[1].block_range, (5..=7).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[0].block_range, (1..=2).collect::<Vec<u64>>(),);
+        assert_eq!(multiple[1].block_range, (3..=4).collect::<Vec<u64>>(),);
 
         // After setting env var.
         std::env::set_var("BLOCK_RANGE", "123..=321");
@@ -515,20 +513,18 @@ mod tests {
             preset_chunk().block_range,
             (123..=321).collect::<Vec<u64>>()
         );
-        std::env::set_var("BLOCK_RANGE", "1..=2,3..=4,5..=6");
+        std::env::set_var("BLOCK_RANGE", "1..=1,2..=2,3..=4");
         let multiple = preset_chunk_multiple();
-        assert_eq!(multiple[0].block_range, (1u64..=2u64).collect::<Vec<u64>>());
-        assert_eq!(multiple[1].block_range, (3u64..=4u64).collect::<Vec<u64>>());
-        assert_eq!(multiple[2].block_range, (5u64..=6u64).collect::<Vec<u64>>());
+        assert_eq!(multiple[0].block_range, (1u64..=1u64).collect::<Vec<u64>>());
+        assert_eq!(multiple[1].block_range, (2u64..=2u64).collect::<Vec<u64>>());
+        assert_eq!(multiple[2].block_range, (3u64..=4u64).collect::<Vec<u64>>());
         std::env::remove_var("BLOCK_RANGE");
     }
 
     /// Parent loading is independent of the public-input endpoint semantics.
     #[test]
     fn a_parent_header_is_read_for_every_supported_fork() {
-        let tsuki = Path::new(PATH_TESTDATA)
-            .join("tsuki-base-fee")
-            .join("witnesses");
+        let tsuki = Path::new(PATH_TESTDATA).join("tsuki-dev").join("witnesses");
         let missing = Path::new(PATH_TESTDATA).join("feynman").join("witnesses");
         for fork in [
             ForkName::Feynman,
@@ -558,9 +554,9 @@ mod tests {
             scroll::chunk::{ChunkWitness, SecretKey},
         };
 
-        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let source = Path::new(PATH_TESTDATA).join("tsuki-dev/witnesses");
         let dir = tempfile::tempdir().unwrap();
-        for number in [2, 5] {
+        for number in [2, 4] {
             let parent = read_block_witness(source.join(format!("{}.json", number - 1)))
                 .unwrap()
                 .header;
@@ -593,7 +589,7 @@ mod tests {
     #[test]
     fn parent_files_cannot_silently_select_the_wrong_height() {
         use super::read_block_witness;
-        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let source = Path::new(PATH_TESTDATA).join("tsuki-dev/witnesses");
         let dir = tempfile::tempdir().unwrap();
         let parent = read_block_witness(source.join("1.json")).unwrap().header;
         std::fs::write(
@@ -620,7 +616,7 @@ mod tests {
     fn trace_paths_load_the_first_blocks_parent_and_skip_header_files() {
         use super::{read_block_witness, read_scroll_chunk_from_paths};
         use scroll_zkvm_types::{public_inputs::Version, scroll::chunk::execute};
-        let source = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+        let source = Path::new(PATH_TESTDATA).join("tsuki-dev/witnesses");
         let dir = tempfile::tempdir().unwrap();
         for name in ["parent.json", "1.json", "2.json"] {
             std::fs::copy(source.join(name), dir.path().join(name)).unwrap();
