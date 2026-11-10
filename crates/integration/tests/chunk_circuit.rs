@@ -46,10 +46,29 @@ fn test_execute() -> eyre::Result<()> {
     ChunkProverTester::setup(true)?;
 
     let wit = get_witness_from_env_or_builder(&mut preset_chunk())?;
+    let expected =
+        metadata_from_chunk_witnesses(wit.clone())?.pi_hash_by_version(Version::from(wit.version));
     let (exec_result, total_gas_used) = exec_chunk(&wit)?;
+    assert_eq!(exec_result.public_values.as_slice(), expected.as_slice());
     let cycle_per_gas = exec_result.total_cycle as f64 / total_gas_used as f64;
     assert!(cycle_per_gas > 0.0);
     assert!(cycle_per_gas <= 35.0);
+    Ok(())
+}
+
+/// Exercise the compiled guest, not just native metadata derivation: the old synthetic Chikyu
+/// corpus must not be accepted as an approved testnet cutover configuration.
+#[test]
+fn test_tsuki_guest_rejects_pending_testnet() -> eyre::Result<()> {
+    ChunkProverTester::setup(true)?;
+    let dir = Path::new(PATH_TESTDATA).join("tsuki-base-fee/witnesses");
+    let block = read_block_witness(dir.join("1.json"))?;
+    let parent = read_parent_header(&dir, 1, Version::tsuki().fork)?;
+    let witness = ChunkWitness::new_scroll(11, &[block], B256::ZERO, Version::tsuki().fork, parent);
+    assert!(
+        exec_chunk(&witness).is_err(),
+        "guest must reject the TBD testnet configuration"
+    );
     Ok(())
 }
 
