@@ -15,11 +15,12 @@
 //! witness-chaining check first. These tests pin the two error paths instead.
 
 mod common;
+use common::execute;
 
 use common::{TSUKI_VERSION_BYTE, base_fee_chunk};
 use sbv_core::BlockWitness;
 use sbv_primitives::{B256, types::consensus::Header};
-use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
+use scroll_zkvm_types_chunk::scroll::ChunkWitness;
 use types_base::fork_name::ForkName;
 
 fn witness(parent: Header, blocks: &[BlockWitness]) -> ChunkWitness {

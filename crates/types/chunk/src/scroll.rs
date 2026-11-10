@@ -5,7 +5,7 @@ pub use types::{
 };
 
 mod execute;
-pub use execute::execute;
+pub use execute::{execute, execute_with_tsuki_config};
 
 mod witness;
 pub use witness::{ChunkWitness, ValidiumInputs, fork_is_anchored};

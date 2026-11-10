@@ -4,7 +4,7 @@ use sbv_core::verifier::{VerifyContext, VerifyResult};
 use sbv_helpers::manually_drop_on_zkvm;
 use sbv_primitives::{
     B256, U256,
-    chainspec::{Chain, build_chain_spec_force_hardfork},
+    chainspec::{Chain, GuestChainConfig, build_chain_spec_force_hardfork},
     hardforks::Hardfork,
     types::{
         consensus::BlockHeader,
@@ -25,6 +25,31 @@ use types_base::{
 /// and the domain. They are checked against each other and against the blocks before anything is
 /// executed or hashed.
 pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
+    execute_inner(witness, None)
+}
+
+/// Execute a Tsuki chunk with configuration authenticated by the caller.
+///
+/// This is for native replay and custom guest programs that fix the configuration in their
+/// executable. Never populate either argument from unchecked witness data. The standard guest
+/// calls [`execute`], whose supported configurations are compiled into the program. A migrating
+/// network must set `config.config.withdrawal_queue_checkpoint` to its frozen capture and rebuild
+/// the guest and all downstream commitments before accepting proofs.
+pub fn execute_with_tsuki_config(
+    witness: ChunkWitness,
+    config: GuestChainConfig,
+    activation_timestamp: u64,
+) -> Result<ChunkInfo, String> {
+    if witness.fork_name != ForkName::Tsuki {
+        return Err("an explicit Tsuki configuration requires a Tsuki chunk".into());
+    }
+    execute_inner(witness, Some((config, activation_timestamp)))
+}
+
+fn execute_inner(
+    witness: ChunkWitness,
+    tsuki_config: Option<(GuestChainConfig, u64)>,
+) -> Result<ChunkInfo, String> {
     if witness.blocks.is_empty() {
         return Err("a chunk has no blocks".to_string());
     }
@@ -50,8 +75,8 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         ForkName::Galileo => Hardfork::Galileo,
         ForkName::GalileoV2 => Hardfork::GalileoV2,
         // TsukiV2 keeps the Tsuki version byte (11) and public-input layout, but the
-        // rebuilt guest proves only TsukiV2 execution rules. The host must reject
-        // chunks that start before the chain's tsukiV2Time before requesting a proof.
+        // rebuilt guest proves only TsukiV2 execution rules. The guest itself checks the
+        // trusted activation boundary below, including chunks that straddle the cut.
         ForkName::Tsuki => Hardfork::TsukiV2,
     };
 
@@ -60,7 +85,26 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
     let parent_header = witness.parent_header.expect("parent header checked above");
     let prev_blockhash = parent_header.hash_slow();
 
-    let chain_spec = build_chain_spec_force_hardfork(chain, hardfork);
+    let chain_spec = if witness.fork_name == ForkName::Tsuki {
+        let (config, activation) = match tsuki_config {
+            Some(config) => config,
+            None => trusted_tsuki_config(chain)?,
+        };
+        for block in &witness.blocks {
+            if block.chain_id != config.chain.id() {
+                return Err("block chain ID does not match the trusted Tsuki configuration".into());
+            }
+            if block.header.timestamp < activation {
+                return Err(format!(
+                    "block {} precedes trusted TsukiV2 activation at {activation}",
+                    block.header.number
+                ));
+            }
+        }
+        config.build_tsuki_at(activation)
+    } else {
+        build_chain_spec_force_hardfork(chain, hardfork)
+    };
 
     let VerifyResult {
         blocks,
@@ -133,6 +177,39 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
     println!("chunk_info = {}", chunk_info);
 
     Ok(chunk_info)
+}
+
+/// These values are part of the guest's program commitment, never selected by witness fields
+/// other than the chain ID. Chikyu's node schedule is a placeholder, not an approved cutover.
+fn trusted_tsuki_config(chain: Chain) -> Result<(GuestChainConfig, u64), String> {
+    match chain.id() {
+        1_122_005 => Ok((GuestChainConfig::for_chain(chain), 0)),
+        id if id == Chain::dev().id() => Ok((GuestChainConfig::for_chain(chain), 0)),
+        6_281_971 => {
+            Err("Chikyu TsukiV2 activation and withdrawal queue checkpoint are TBD".into())
+        }
+        _ => Err(format!(
+            "no trusted Tsuki configuration for chain {}",
+            chain.id()
+        )),
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+    use sbv_primitives::chainspec::{ForkCondition, Hardforks};
+
+    #[test]
+    fn mainnet_activates_at_zero_without_a_migration_checkpoint() {
+        let (config, timestamp) = trusted_tsuki_config(Chain::from_id(1_122_005)).unwrap();
+        assert_eq!(timestamp, 0);
+        assert_eq!(config.config.withdrawal_queue_checkpoint, None);
+        assert_eq!(
+            config.build_tsuki_at(timestamp).fork(Hardfork::TsukiV2),
+            ForkCondition::Timestamp(0)
+        );
+    }
 }
 
 /// The fork the chunk claims has to be the fork its version byte names.

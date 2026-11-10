@@ -1,5 +1,13 @@
 # Tsuki base-fee corpus
 
+This synthetic corpus uses Chikyu chain ID 6281971 with TsukiV2 active at zero.
+It is not an authenticated testnet migration capture. Since dogeos-reth #57,
+the standard guest rejects Chikyu until its activation time and frozen withdrawal
+queue checkpoint are approved. Native chunk regression tests use an explicit
+trusted test configuration; these fixtures must not be used to qualify the
+production guest or generate deployment proofs. Mainnet activates at zero and
+already has the hash-chain queue in genesis, so it needs no migration checkpoint.
+
 Seven blocks of a short Tsuki chain, built by a node that enforces the base-fee rule at import and
 writes the L2SystemConfig overhead slot into its execution witnesses. It is the corpus the chunk
 path's positive Tsuki tests run on, because it is the first one the guest can verify: the overhead

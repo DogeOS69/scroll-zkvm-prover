@@ -11,6 +11,21 @@ use types_base::version::Version;
 
 pub const TSUKI_VERSION_BYTE: u8 = Version::tsuki().as_version_byte();
 
+/// The synthetic corpus uses Chikyu's ID with a TsukiV2-at-zero schedule. It is not a production
+/// Chikyu migration capture. Keep this trusted test override outside the standard guest path.
+pub fn execute(
+    witness: scroll_zkvm_types_chunk::scroll::ChunkWitness,
+) -> Result<types_base::public_inputs::scroll::chunk::ChunkInfo, String> {
+    use sbv_primitives::chainspec::{Chain, GuestChainConfig};
+    use scroll_zkvm_types_chunk::scroll::{execute, execute_with_tsuki_config};
+    if witness.fork_name == types_base::fork_name::ForkName::Tsuki {
+        let config = GuestChainConfig::for_chain(Chain::from_id(6_281_971));
+        execute_with_tsuki_config(witness, config, 0)
+    } else {
+        execute(witness)
+    }
+}
+
 /// Reads the native SBV witness format. Legacy corpora must be regenerated before replay.
 fn read_witness(path: &Path) -> BlockWitness {
     let json = std::fs::read(path).unwrap();
