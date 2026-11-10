@@ -9,12 +9,12 @@
 //! bundle proof finalizes on-chain is a block hash from Tsuki.
 
 mod common;
+use common::execute;
 
 use common::{TSUKI_VERSION_BYTE, base_fee_chunk, feynman_blocks};
 use sbv_core::BlockWitness;
-use sbv_primitives::types::consensus::BlockHeader as _;
 use sbv_primitives::{B256, U256, types::Header};
-use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute, fork_is_anchored};
+use scroll_zkvm_types_chunk::scroll::{ChunkWitness, fork_is_anchored};
 use types_base::{
     fork_name::ForkName,
     public_inputs::MultiVersionPublicInputs,

@@ -14,6 +14,7 @@ on:
       - crates/integration/tests/**/*
       - crates/integration/testdata/tsuki/**/*
       - crates/integration/testdata/tsuki-base-fee/**/*
+      - crates/integration/testdata/tsuki-dev/**/*
       - crates/integration/testdata/validium/**/*
   push:
     branches:
@@ -32,6 +33,7 @@ on:
       - crates/integration/tests/**/*
       - crates/integration/testdata/tsuki/**/*
       - crates/integration/testdata/tsuki-base-fee/**/*
+      - crates/integration/testdata/tsuki-dev/**/*
       - crates/integration/testdata/validium/**/*
   workflow_dispatch:
 

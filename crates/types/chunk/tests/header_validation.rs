@@ -10,10 +10,11 @@
 //! without the parent header they are rooted in; SBV's own tests cover each rule.
 
 mod common;
+use common::execute;
 
 use common::{TSUKI_VERSION_BYTE, base_fee_chunk};
 use sbv_primitives::{B256, U256, types::consensus::Header};
-use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
+use scroll_zkvm_types_chunk::scroll::ChunkWitness;
 use types_base::fork_name::ForkName;
 
 fn tsuki_witness() -> ChunkWitness {
@@ -25,6 +26,65 @@ fn tsuki_witness() -> ChunkWitness {
         ForkName::Tsuki,
         parent,
     )
+}
+
+#[test]
+fn standard_guest_rejects_tbd_testnet_and_unknown_chains() {
+    for chain in [6_281_971, 424_242] {
+        let mut witness = tsuki_witness();
+        for block in &mut witness.blocks {
+            block.chain_id = chain;
+        }
+        let error = scroll_zkvm_types_chunk::scroll::execute(witness).unwrap_err();
+        assert!(
+            error.contains("TBD") || error.contains("no trusted Tsuki configuration"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn trusted_cutover_rejects_pre_activation_blocks_including_straddling_chunks() {
+    use sbv_primitives::chainspec::{Chain, GuestChainConfig};
+    use scroll_zkvm_types_chunk::scroll::execute_with_tsuki_config;
+    let witness = tsuki_witness();
+    let activation = witness.blocks[1].header.timestamp;
+    let config = GuestChainConfig::for_chain(Chain::from_id(6_281_971));
+    let error = execute_with_tsuki_config(witness, config.clone(), activation).unwrap_err();
+    assert!(
+        error.contains("precedes trusted TsukiV2 activation"),
+        "{error}"
+    );
+
+    // A later offending block must also be rejected, even if the first block is post-cut.
+    let mut witness = tsuki_witness();
+    witness.blocks[0].header.timestamp = activation;
+    witness.blocks[1].header.timestamp = activation - 1;
+    let error = execute_with_tsuki_config(witness, config, activation).unwrap_err();
+    assert!(
+        error.contains("block 2 precedes trusted TsukiV2 activation"),
+        "{error}"
+    );
+}
+
+#[test]
+fn trusted_cutover_accepts_the_boundary_with_a_pre_cut_parent() {
+    use sbv_primitives::chainspec::{Chain, GuestChainConfig};
+    use scroll_zkvm_types_chunk::scroll::execute_with_tsuki_config;
+    let witness = tsuki_witness();
+    let activation = witness.blocks[0].header.timestamp;
+    assert!(witness.parent_header.as_ref().unwrap().timestamp < activation);
+    let config = GuestChainConfig::for_chain(Chain::from_id(6_281_971));
+    execute_with_tsuki_config(witness, config, activation).expect("first block at the cut");
+}
+
+#[test]
+fn explicit_configuration_cannot_be_applied_to_another_chain() {
+    use sbv_primitives::chainspec::{Chain, GuestChainConfig};
+    use scroll_zkvm_types_chunk::scroll::execute_with_tsuki_config;
+    let config = GuestChainConfig::for_chain(Chain::from_id(1_122_005));
+    let error = execute_with_tsuki_config(tsuki_witness(), config, 0).unwrap_err();
+    assert!(error.contains("chain ID does not match"), "{error}");
 }
 
 /// A header field that no transaction reads changes the block hash without changing execution,

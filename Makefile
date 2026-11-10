@@ -75,6 +75,7 @@ test-tsuki-golden:
 
 .PHONY: test-batch-codec
 test-batch-codec:
+	@if command -v sha256sum >/dev/null 2>&1; then cd crates/integration/testdata/tsuki-dev && sha256sum -c SHA256SUMS; else cd crates/integration/testdata/tsuki-dev && shasum -a 256 -c SHA256SUMS; fi
 # Fail if multiple encoder sources make the package specification ambiguous.
 	@cargo tree --locked -p scroll-zkvm-integration --invert encoder-standard >/dev/null
 	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --lib utils::test_build_and_parse_batch_task -- --exact
@@ -88,6 +89,13 @@ test-chunk-witness-checks:
 test-parent-header-callers:
 	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --lib testers::chunk::tests
 	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --bin chunk-scanner
+
+# Requires freshly rebuilt releases/dev assets. Compare VM public values with native replay
+# and check that the compiled guest rejects the unconfigured testnet.
+.PHONY: test-tsuki-guest-config
+test-tsuki-guest-config:
+	@cargo test $(CARGO_CONFIG_FLAG) --release --locked -p scroll-zkvm-integration --test chunk_circuit test_execute -- --exact --nocapture
+	@cargo test $(CARGO_CONFIG_FLAG) --release --locked -p scroll-zkvm-integration --test chunk_circuit test_tsuki_guest_rejects_pending_testnet -- --exact --nocapture
 
 test-execute-validium-chunk:
 	@cargo test --release -p scroll-zkvm-integration --test chunk_circuit test_execute_validium -- --exact --nocapture

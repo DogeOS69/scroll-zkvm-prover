@@ -10,10 +10,11 @@
 //! which rules apply and the version decides the layout the result is serialised into.
 
 mod common;
+use common::execute;
 
 use common::{TSUKI_VERSION_BYTE, base_fee_chunk};
 use sbv_primitives::B256;
-use scroll_zkvm_types_chunk::scroll::{ChunkWitness, ValidiumInputs, execute};
+use scroll_zkvm_types_chunk::scroll::{ChunkWitness, ValidiumInputs};
 use types_base::{fork_name::ForkName, version::Version};
 
 fn validium_inputs(lists: usize) -> ValidiumInputs {
