@@ -94,8 +94,8 @@ test-parent-header-callers:
 # and check that the compiled guest rejects the unconfigured testnet.
 .PHONY: test-tsuki-guest-config
 test-tsuki-guest-config:
-	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --test chunk_circuit test_execute -- --exact --nocapture
-	@cargo test $(CARGO_CONFIG_FLAG) --locked -p scroll-zkvm-integration --test chunk_circuit test_tsuki_guest_rejects_pending_testnet -- --exact --nocapture
+	@cargo test $(CARGO_CONFIG_FLAG) --release --locked -p scroll-zkvm-integration --test chunk_circuit test_execute -- --exact --nocapture
+	@cargo test $(CARGO_CONFIG_FLAG) --release --locked -p scroll-zkvm-integration --test chunk_circuit test_tsuki_guest_rejects_pending_testnet -- --exact --nocapture
 
 test-execute-validium-chunk:
 	@cargo test --release -p scroll-zkvm-integration --test chunk_circuit test_execute_validium -- --exact --nocapture
