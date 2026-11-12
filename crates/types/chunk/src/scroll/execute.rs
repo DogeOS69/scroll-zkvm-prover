@@ -49,13 +49,13 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
         ForkName::Feynman => Hardfork::Feynman,
         ForkName::Galileo => Hardfork::Galileo,
         ForkName::GalileoV2 => Hardfork::GalileoV2,
-        // TsukiV2 keeps the Tsuki version byte (11) and public-input layout, but the
-        // rebuilt guest proves only TsukiV2 execution rules. The host must reject
-        // chunks that start before the chain's tsukiV2Time before requesting a proof.
-        ForkName::Tsuki => Hardfork::TsukiV2,
+        // TsukiV2 is version byte 12. DogeOS's Tsuki (v11) has no version here, so no chunk is
+        // proven under Tsuki rules; v12 batches hold only blocks from tsukiV2Time on, because
+        // the host cuts batches at every fork boundary.
+        ForkName::TsukiV2 => Hardfork::TsukiV2,
     };
 
-    // SBV validates every chunk against its parent, including pre-Tsuki chunks whose public
+    // SBV validates every chunk against its parent, including pre-TsukiV2 chunks whose public
     // endpoints remain state roots. Pass ownership of the native header into the verifier.
     let parent_header = witness.parent_header.expect("parent header checked above");
     let prev_blockhash = parent_header.hash_slow();
@@ -140,7 +140,7 @@ pub fn execute(witness: ChunkWitness) -> Result<ChunkInfo, String> {
 /// `fork_name` selects the endpoint semantics and base-fee rules, while `version` selects the
 /// public-input layout the result is serialised into. The guest asserts the same equality before
 /// it commits anything, so a proof
-/// cannot pair the legacy state-root path with a Tsuki public input; this is the host-side half, so
+/// cannot pair the legacy state-root path with a TsukiV2 public input; this is the host-side half, so
 /// that metadata derived outside the guest cannot either.
 fn check_version_fork(witness: &ChunkWitness) -> Result<(), String> {
     let version = Version::from(witness.version);

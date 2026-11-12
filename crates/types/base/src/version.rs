@@ -58,8 +58,12 @@ pub enum STFVersion {
     V9 = 9,
     /// Scroll@v10.
     V10 = 10,
-    /// Dogeos@v11.
+    /// DogeOS@v11 (Tsuki). Kept so hosts can name the codec of Tsuki batches; it has no
+    /// [`Version`] and no public-input definitions, so nothing is proven under it. Its batches
+    /// carry the earlier public-input meaning (state-root endpoints, masked queue hash).
     V11 = 11,
+    /// DogeOS@v12 (TsukiV2).
+    V12 = 12,
 }
 
 impl From<u8> for STFVersion {
@@ -72,6 +76,7 @@ impl From<u8> for STFVersion {
             9 => Self::V9,
             10 => Self::V10,
             11 => Self::V11,
+            12 => Self::V12,
             value => unreachable!("unsupported stf-version={value}"),
         }
     }
@@ -181,11 +186,11 @@ impl Version {
         self.domain == Domain::Validium
     }
 
-    pub const fn tsuki() -> Self {
+    pub const fn tsuki_v2() -> Self {
         Self {
             domain: Domain::Scroll,
-            stf_version: STFVersion::V11,
-            fork: ForkName::Tsuki,
+            stf_version: STFVersion::V12,
+            fork: ForkName::TsukiV2,
             codec: Codec::V7,
         }
     }
@@ -212,7 +217,7 @@ impl From<u8> for Version {
             (Domain::Scroll, STFVersion::V8) => Self::feynman(),
             (Domain::Scroll, STFVersion::V9) => Self::galileo(),
             (Domain::Scroll, STFVersion::V10) => Self::galileo_v2(),
-            (Domain::Scroll, STFVersion::V11) => Self::tsuki(),
+            (Domain::Scroll, STFVersion::V12) => Self::tsuki_v2(),
             (Domain::Validium, STFVersion::V1) => Self::validium_v1(),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
@@ -229,3 +234,37 @@ pub const SCROLL_GALILEO: u8 = Version::galileo().as_version_byte();
 
 /// Version byte for GalileoV2 @ v10.
 pub const SCROLL_GALILEO_V2: u8 = Version::galileo_v2().as_version_byte();
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tsuki_v2_is_version_byte_12() {
+        let version = Version::tsuki_v2();
+        assert_eq!(version.as_version_byte(), 12);
+        let parsed = Version::from(12);
+        assert_eq!(parsed.fork, ForkName::TsukiV2);
+        assert_eq!(parsed.as_version_byte(), 12);
+    }
+
+    /// DogeOS's v11 (Tsuki) public inputs had state-root endpoints and a masked queue hash; the
+    /// current definitions are TsukiV2's, so a v11 version byte must not select them.
+    #[test]
+    #[should_panic(expected = "unsupported version=(Scroll, V11)")]
+    fn version_byte_11_is_unsupported() {
+        let _ = Version::from(11);
+    }
+
+    #[test]
+    #[should_panic(expected = "hardfork not accepted: tsuki")]
+    fn tsuki_fork_name_is_unsupported() {
+        let _ = ForkName::from("tsuki");
+    }
+
+    #[test]
+    fn tsuki_v2_fork_name_round_trips() {
+        assert_eq!(ForkName::from("tsukiv2"), ForkName::TsukiV2);
+        assert_eq!(ForkName::TsukiV2.as_str(), "tsukiv2");
+    }
+}

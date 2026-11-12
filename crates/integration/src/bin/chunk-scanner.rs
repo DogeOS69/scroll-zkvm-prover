@@ -376,14 +376,14 @@ mod tests {
         read_parent_header(
             Path::new("testdata/tsuki-base-fee/witnesses"),
             1,
-            Version::tsuki().fork,
+            Version::tsuki_v2().fork,
         )
         .unwrap()
     }
 
     #[test]
     fn chunk_boundaries_keep_the_correct_parent_and_incoming_gas() {
-        let version = Version::tsuki();
+        let version = Version::tsuki_v2();
         let first = fixture(1);
         let mut pending = PendingChunk::new(genesis(), first, 1);
         let mut completed = Vec::new();

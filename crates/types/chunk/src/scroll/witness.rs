@@ -12,7 +12,7 @@ use types_base::{fork_name::ForkName, public_inputs::scroll::chunk::ChunkInfo};
 /// Earlier forks publish state roots. Every supported fork still requires a parent header for
 /// SBV validation, independently of the endpoint semantics.
 pub fn fork_is_anchored(fork: ForkName) -> bool {
-    fork >= ForkName::Tsuki
+    fork >= ForkName::TsukiV2
 }
 
 /// The witness type accepted by the chunk-circuit.
@@ -35,7 +35,7 @@ pub struct ChunkWitness {
     /// The header of the block before the chunk's first block.
     ///
     /// Required at execution for every supported fork: SBV checks the first block and pre-state
-    /// against it. From Tsuki its hash is also the chunk's previous proof endpoint; earlier forks
+    /// against it. From TsukiV2 its hash is also the chunk's previous proof endpoint; earlier forks
     /// retain state-root endpoints.
     ///
     /// Adding this field is a **breaking wire change**, and the `Option` does not soften it:

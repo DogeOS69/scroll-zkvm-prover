@@ -11,7 +11,7 @@
 
 mod common;
 
-use common::{TSUKI_VERSION_BYTE, base_fee_chunk};
+use common::{TSUKI_V2_VERSION_BYTE, base_fee_chunk};
 use sbv_primitives::B256;
 use scroll_zkvm_types_chunk::scroll::{ChunkWitness, ValidiumInputs, execute};
 use types_base::{fork_name::ForkName, version::Version};
@@ -33,10 +33,10 @@ fn scroll_domain_chunk_with_validium_inputs_is_rejected() {
     let (parent, blocks) = base_fee_chunk();
     for lists in [0, blocks.len()] {
         let mut witness = ChunkWitness::new_scroll(
-            TSUKI_VERSION_BYTE,
+            TSUKI_V2_VERSION_BYTE,
             &blocks,
             B256::ZERO,
-            ForkName::Tsuki,
+            ForkName::TsukiV2,
             parent.clone(),
         );
         witness.validium = Some(validium_inputs(lists));
@@ -88,7 +88,7 @@ fn validium_inputs_need_one_list_per_block() {
 
 /// A fork that is not the one the version byte names is rejected. The guest asserts the same
 /// equality before it commits anything, so a proof cannot pair the legacy state-root path with a
-/// Tsuki public input; this is the host-side half.
+/// TsukiV2 public input; this is the host-side half.
 #[test]
 fn a_fork_that_is_not_the_versions_own_is_rejected() {
     let (parent, blocks) = base_fee_chunk();
@@ -96,7 +96,7 @@ fn a_fork_that_is_not_the_versions_own_is_rejected() {
         Version::validium_v1().as_version_byte(),
         &blocks,
         B256::ZERO,
-        ForkName::Tsuki,
+        ForkName::TsukiV2,
         Some(validium_inputs(blocks.len())),
         parent,
     );
@@ -106,7 +106,7 @@ fn a_fork_that_is_not_the_versions_own_is_rejected() {
         err,
         format!(
             "fork {} does not match the fork of version byte {}, which is {}",
-            ForkName::Tsuki,
+            ForkName::TsukiV2,
             Version::validium_v1().as_version_byte(),
             validium_fork()
         )

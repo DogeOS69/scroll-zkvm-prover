@@ -178,7 +178,7 @@ fn test_execute_multi() -> eyre::Result<()> {
 #[ignore = "golden metadata predates the tsuki-base-fee corpus and block-hash endpoints"]
 #[test]
 fn test_tsuki_golden_chunk_metadata() -> eyre::Result<()> {
-    let version = Version::tsuki();
+    let version = Version::tsuki_v2();
     let infos = tsuki_golden_chunk_tasks()?
         .into_iter()
         .map(|mut task| metadata_from_chunk_witnesses(task.get_or_build_witness()?))

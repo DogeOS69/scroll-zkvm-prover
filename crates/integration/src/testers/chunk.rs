@@ -100,7 +100,7 @@ pub struct ChunkTaskGenerator {
 }
 
 fn initial_prev_message_hash(version: Version) -> B256 {
-    if version.fork == ForkName::Tsuki {
+    if version.fork == ForkName::TsukiV2 {
         B256::ZERO
     } else {
         B256::repeat_byte(1u8)
@@ -310,7 +310,7 @@ pub fn preset_chunk() -> ChunkTaskGenerator {
         ForkName::Feynman => (Version::feynman(), 16525000u64..=16525003u64),
         ForkName::Galileo => (Version::galileo(), 20239156..=20239235),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240..=20239245),
-        ForkName::Tsuki => (Version::tsuki(), 1..=7),
+        ForkName::TsukiV2 => (Version::tsuki_v2(), 1..=7),
     };
 
     // If the BLOCK_RANGE env var is set, use that instead.
@@ -374,7 +374,7 @@ fn tsuki_golden_chunk_ranges() -> [std::ops::RangeInclusive<u64>; 2] {
 }
 
 pub fn tsuki_golden_chunk_tasks() -> eyre::Result<Vec<ChunkTaskGenerator>> {
-    create_canonical_tasks(Version::tsuki(), tsuki_golden_chunk_ranges().into_iter())
+    create_canonical_tasks(Version::tsuki_v2(), tsuki_golden_chunk_ranges().into_iter())
 }
 
 /// preset examples for multiple task
@@ -416,9 +416,9 @@ pub fn preset_chunk_multiple() -> Vec<ChunkTaskGenerator> {
             ],
             Version::galileo_v2(),
         ),
-        ForkName::Tsuki => (
+        ForkName::TsukiV2 => (
             tsuki_golden_chunk_ranges().into_iter().collect(),
-            Version::tsuki(),
+            Version::tsuki_v2(),
         ),
     };
     // If the BLOCK_RANGE env var has been set, use that instead.
@@ -534,7 +534,7 @@ mod tests {
             ForkName::Feynman,
             ForkName::Galileo,
             ForkName::GalileoV2,
-            ForkName::Tsuki,
+            ForkName::TsukiV2,
         ] {
             for first_block in [1, 2] {
                 let parent = read_parent_header(&tsuki, first_block, fork)
@@ -601,19 +601,19 @@ mod tests {
             serde_json::to_vec(&parent).unwrap(),
         )
         .unwrap();
-        let error = read_parent_header(dir.path(), 5, ForkName::Tsuki)
+        let error = read_parent_header(dir.path(), 5, ForkName::TsukiV2)
             .unwrap_err()
             .to_string();
         assert!(error.contains("expected parent block 4"), "{error}");
         assert!(
-            read_parent_header(dir.path(), 0, ForkName::Tsuki)
+            read_parent_header(dir.path(), 0, ForkName::TsukiV2)
                 .unwrap_err()
                 .to_string()
                 .contains("genesis")
         );
         // A present but malformed block-specific parent must not fall back to parent.json.
         std::fs::write(dir.path().join("2.parent.json"), b"null").unwrap();
-        assert!(read_parent_header(dir.path(), 2, ForkName::Tsuki).is_err());
+        assert!(read_parent_header(dir.path(), 2, ForkName::TsukiV2).is_err());
     }
 
     #[test]
@@ -635,7 +635,7 @@ mod tests {
             ["2.json", "parent.json", "2.parent.json", "1.json"]
                 .map(|name| dir.path().join(name))
                 .to_vec(),
-            Version::tsuki(),
+            Version::tsuki_v2(),
         )
         .unwrap();
         assert_eq!(
@@ -652,7 +652,7 @@ mod tests {
         );
         execute(witness).expect("the loaded parent and native witnesses must execute together");
         assert!(
-            read_scroll_chunk_from_paths(vec![dir.path().join("parent.json")], Version::tsuki())
+            read_scroll_chunk_from_paths(vec![dir.path().join("parent.json")], Version::tsuki_v2())
                 .unwrap_err()
                 .to_string()
                 .contains("matched no witnesses")

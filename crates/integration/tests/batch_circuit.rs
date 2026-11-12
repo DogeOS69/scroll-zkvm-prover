@@ -79,7 +79,7 @@ fn e2e() -> eyre::Result<()> {
 fn verify_batch_hash_invariant() -> eyre::Result<()> {
     use scroll_zkvm_types::public_inputs::ForkName;
 
-    let outcome_1 = if testing_version().fork == ForkName::Tsuki {
+    let outcome_1 = if testing_version().fork == ForkName::TsukiV2 {
         tsuki_golden_chunk_tasks()?
     } else {
         preset_chunk_multiple()
@@ -124,7 +124,7 @@ fn verify_batch_hash_invariant() -> eyre::Result<()> {
         ),
         // A different partition of the same `tsuki-base-fee` blocks as `tsuki_golden_chunk_tasks`,
         // which is the point: the blob encoding must not depend on where the chunk boundaries fall.
-        ForkName::Tsuki => (Version::tsuki(), vec![1..=2, 3..=5, 6..=7]),
+        ForkName::TsukiV2 => (Version::tsuki_v2(), vec![1..=2, 3..=5, 6..=7]),
     };
     let outcome_2 = create_canonical_tasks(version, block_range.into_iter())?;
 
@@ -173,7 +173,7 @@ fn test_tsuki_golden_batch_metadata() -> eyre::Result<()> {
         b256!("54097ced498c20c61c9817f44dae4a4cb197c818810aa5a9717c67814f3925f6")
     );
     assert_eq!(
-        info.pi_hash_by_version(Version::tsuki()),
+        info.pi_hash_by_version(Version::tsuki_v2()),
         b256!("f2e2bce630d2991ae1dc8dd95101f718d35b72b569e1596551b0c2079a1e5c39")
     );
 

@@ -3,9 +3,9 @@
 Committed fixture for the DogeOS `next_message_index` overlay
 (`dogeos/changes/next-message-index.md`): Scroll's `nextMessageIndex` is threaded
 out of the patched stateless-block-verifier into `ChunkInfo` / `BatchInfo` and
-committed into the **Tsuki / Scroll@v11** public inputs. Tsuki is DogeOS's
-production fork; `ForkName::Tsuki` / `Version::tsuki()` are introduced by PR #9
-(`feat/tsuki-hardfork`), which this branch **stacks on**.
+committed into the **TsukiV2 / Scroll@v12** public inputs (originally
+introduced under Tsuki / v11 by PR #9; DogeOS's v11 is no longer provable, and
+the same definitions now sit under `ForkName::TsukiV2` / `Version::tsuki_v2()`).
 
 ## Contents
 

@@ -10,7 +10,7 @@ use crate::{
 pub struct BatchInfo {
     /// The batch's previous endpoint: the first chunk's, taken straight from it.
     ///
-    /// From Tsuki that is the **L2 block hash** of the block before the batch's first block, not a
+    /// From TsukiV2 that is the **L2 block hash** of the block before the batch's first block, not a
     /// state root; see [`ChunkInfo::prev_state_root`][crate::public_inputs::scroll::chunk::ChunkInfo::prev_state_root].
     /// The field name and the byte layout are unchanged.
     pub parent_state_root: B256,
@@ -18,7 +18,7 @@ pub struct BatchInfo {
     pub parent_batch_hash: B256,
     /// The batch's final endpoint: the last chunk's, taken straight from it.
     ///
-    /// From Tsuki that is the **L2 block hash** of the batch's last block, not a state root.
+    /// From TsukiV2 that is the **L2 block hash** of the batch's last block, not a state root.
     pub state_root: B256,
     /// The batch header hash of the batch.
     pub batch_hash: B256,
@@ -179,7 +179,7 @@ impl BatchInfo {
             .collect()
     }
 
-    /// Public inputs encoded for a batch for Scroll@v11 (Tsuki) is defined as
+    /// Public inputs encoded for a batch for Scroll@v12 (TsukiV2) is defined as
     ///
     /// concat(
     ///     version ||
@@ -193,7 +193,7 @@ impl BatchInfo {
     ///     prev msg queue hash ||
     ///     post msg queue hash
     /// )
-    pub fn pi_tsuki(&self, version: Version) -> Vec<u8> {
+    pub fn pi_tsuki_v2(&self, version: Version) -> Vec<u8> {
         std::iter::empty()
             .chain(&[version.as_version_byte()])
             .chain(self.parent_state_root.as_slice())
@@ -220,7 +220,7 @@ impl MultiVersionPublicInputs for BatchInfo {
             (Domain::Scroll, STFVersion::V8) => self.pi_feynman(),
             (Domain::Scroll, STFVersion::V9) => self.pi_galileo(version),
             (Domain::Scroll, STFVersion::V10) => self.pi_galileo_v2(version),
-            (Domain::Scroll, STFVersion::V11) => self.pi_tsuki(version),
+            (Domain::Scroll, STFVersion::V12) => self.pi_tsuki_v2(version),
             (Domain::Validium, STFVersion::V1) => self.pi_validium(version),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
@@ -240,8 +240,8 @@ impl MultiVersionPublicInputs for BatchInfo {
         assert_eq!(self.parent_batch_hash, prev_pi.batch_hash);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
 
-        // Scroll@v11 commits next_message_index into the PI, so it must not regress.
-        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V11) {
+        // Scroll@v12 commits next_message_index into the PI, so it must not regress.
+        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V12) {
             assert!(
                 self.next_message_index >= prev_pi.next_message_index,
                 "next_message_index must not regress"
@@ -319,35 +319,55 @@ mod tests {
     }
 
     #[test]
-    fn tsuki_batch_pi_layout_commits_next_message_index() {
-        let pi = sample_batch_info(0x0102_0304_0506_0708).pi_tsuki(Version::tsuki());
+    fn tsuki_v2_batch_pi_layout_commits_next_message_index() {
+        let pi = sample_batch_info(0x0102_0304_0506_0708).pi_tsuki_v2(Version::tsuki_v2());
 
         assert_eq!(pi.len(), 241);
-        assert_eq!(pi[0], Version::tsuki().as_version_byte());
+        assert_eq!(pi[0], Version::tsuki_v2().as_version_byte());
         assert_eq!(&pi[169..177], &0x0102_0304_0506_0708u64.to_be_bytes());
         assert_eq!(&pi[177..209], B256::repeat_byte(0x66).as_slice());
     }
 
     #[test]
-    fn tsuki_batch_validate_reports_regression() {
-        let version = Version::tsuki();
+    fn tsuki_v2_batch_validate_reports_regression() {
+        let version = Version::tsuki_v2();
         let prev = sample_batch_info(22);
         let current = next_contiguous_batch(&prev, 21);
 
         let err = std::panic::catch_unwind(|| current.validate(&prev, version))
-            .expect_err("v11 validation must reject regressions");
+            .expect_err("v12 validation must reject regressions");
 
         let message = panic_message(err);
         assert!(message.contains("next_message_index must not regress"));
     }
 
     #[test]
-    fn pre_v11_batch_validate_ignores_next_message_index_regression() {
+    fn pre_v12_batch_validate_ignores_next_message_index_regression() {
         let version = Version::galileo_v2();
         assert_eq!(version.domain, Domain::Scroll);
 
         let prev = sample_batch_info(22);
         let current = next_contiguous_batch(&prev, 21);
         current.validate(&prev, version);
+    }
+
+    #[test]
+    fn tsuki_v2_dispatch_selects_the_tsuki_v2_layout() {
+        let info = sample_batch_info(7);
+        assert_eq!(
+            info.pi_by_version(Version::tsuki_v2()),
+            info.pi_tsuki_v2(Version::tsuki_v2())
+        );
+    }
+
+    /// v11 has no public-input definition: a hand-built V11 version must not select one.
+    #[test]
+    #[should_panic(expected = "unsupported version=(Scroll, V11)")]
+    fn v11_has_no_batch_public_inputs() {
+        let v11 = Version {
+            stf_version: crate::version::STFVersion::V11,
+            ..Version::tsuki_v2()
+        };
+        let _ = sample_batch_info(7).pi_by_version(v11);
     }
 }

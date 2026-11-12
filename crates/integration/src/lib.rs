@@ -46,7 +46,7 @@ pub fn testing_hardfork() -> ForkName {
 
 /// Test settings (version).
 pub fn testing_version() -> Version {
-    Version::tsuki()
+    Version::tsuki_v2()
 }
 
 pub fn testing_version_validium() -> Version {
@@ -259,14 +259,14 @@ impl TaskProver for Prover {
 
 /// Testdata fixture directory for a fork.
 ///
-/// Tsuki reads `tsuki-base-fee` rather than `tsuki`: from Tsuki a chunk is anchored to the header
+/// TsukiV2 reads `tsuki-base-fee` rather than `tsuki`: from TsukiV2 a chunk is anchored to the header
 /// of the block before it and every block's base fee has to follow the protocol rule, and only a
 /// corpus produced by a node that enforces the rule, and that carries its chain's genesis header,
 /// can satisfy either. The 26-block `tsuki` corpus predates both; see
 /// `testdata/tsuki-base-fee/README.md`.
 pub fn effective_testdata_fork_directory(fork: ForkName) -> &'static str {
     match fork {
-        ForkName::Tsuki => "tsuki-base-fee",
+        ForkName::TsukiV2 => "tsuki-base-fee",
         other => other.as_str(),
     }
 }
