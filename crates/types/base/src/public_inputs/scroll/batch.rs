@@ -350,4 +350,24 @@ mod tests {
         let current = next_contiguous_batch(&prev, 21);
         current.validate(&prev, version);
     }
+
+    #[test]
+    fn tsuki_v2_dispatch_selects_the_tsuki_v2_layout() {
+        let info = sample_batch_info(7);
+        assert_eq!(
+            info.pi_by_version(Version::tsuki_v2()),
+            info.pi_tsuki_v2(Version::tsuki_v2())
+        );
+    }
+
+    /// v11 has no public-input definition: a hand-built V11 version must not select one.
+    #[test]
+    #[should_panic(expected = "unsupported version=(Scroll, V11)")]
+    fn v11_has_no_batch_public_inputs() {
+        let v11 = Version {
+            stf_version: crate::version::STFVersion::V11,
+            ..Version::tsuki_v2()
+        };
+        let _ = sample_batch_info(7).pi_by_version(v11);
+    }
 }
