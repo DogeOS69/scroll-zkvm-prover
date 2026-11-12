@@ -259,7 +259,7 @@ impl TaskProver for Prover {
 
 /// Testdata fixture directory for a fork.
 ///
-/// Tsuki reads `tsuki-base-fee` rather than `tsuki`: from TsukiV2 a chunk is anchored to the header
+/// TsukiV2 reads `tsuki-base-fee` rather than `tsuki`: from TsukiV2 a chunk is anchored to the header
 /// of the block before it and every block's base fee has to follow the protocol rule, and only a
 /// corpus produced by a node that enforces the rule, and that carries its chain's genesis header,
 /// can satisfy either. The 26-block `tsuki` corpus predates both; see

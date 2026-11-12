@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "codec mismatch: expected V6")]
-    fn rejects_tsuki_version() {
+    fn rejects_tsuki_v2_version() {
         let _ = BatchInfoBuilderV6::build(TSUKI_V2, args(TSUKI_V2));
     }
 

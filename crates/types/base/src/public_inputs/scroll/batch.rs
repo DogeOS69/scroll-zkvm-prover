@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn tsuki_batch_pi_layout_commits_next_message_index() {
+    fn tsuki_v2_batch_pi_layout_commits_next_message_index() {
         let pi = sample_batch_info(0x0102_0304_0506_0708).pi_tsuki_v2(Version::tsuki_v2());
 
         assert_eq!(pi.len(), 241);
@@ -329,20 +329,20 @@ mod tests {
     }
 
     #[test]
-    fn tsuki_batch_validate_reports_regression() {
+    fn tsuki_v2_batch_validate_reports_regression() {
         let version = Version::tsuki_v2();
         let prev = sample_batch_info(22);
         let current = next_contiguous_batch(&prev, 21);
 
         let err = std::panic::catch_unwind(|| current.validate(&prev, version))
-            .expect_err("v11 validation must reject regressions");
+            .expect_err("v12 validation must reject regressions");
 
         let message = panic_message(err);
         assert!(message.contains("next_message_index must not regress"));
     }
 
     #[test]
-    fn pre_v11_batch_validate_ignores_next_message_index_regression() {
+    fn pre_v12_batch_validate_ignores_next_message_index_regression() {
         let version = Version::galileo_v2();
         assert_eq!(version.domain, Domain::Scroll);
 

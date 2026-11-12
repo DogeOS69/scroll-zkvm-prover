@@ -172,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn tsuki_bundle_pi_uses_versioned_galileov2_layout() {
+    fn tsuki_v2_bundle_pi_uses_versioned_galileov2_layout() {
         let pi = sample_bundle_info().pi_by_version(Version::tsuki_v2());
 
         assert_eq!(pi.len(), 236);
@@ -180,5 +180,16 @@ mod tests {
         assert_eq!(pi[31], Version::tsuki_v2().as_version_byte());
         assert_eq!(&pi[32..40], &534352u64.to_be_bytes());
         assert_eq!(&pi[40..72], B256::repeat_byte(0x11).as_slice());
+    }
+
+    /// v11 has no public-input definition: a hand-built V11 version must not select one.
+    #[test]
+    #[should_panic(expected = "unsupported version=(Scroll, V11)")]
+    fn v11_has_no_bundle_public_inputs() {
+        let v11 = Version {
+            stf_version: crate::version::STFVersion::V11,
+            ..Version::tsuki_v2()
+        };
+        let _ = sample_bundle_info().pi_by_version(v11);
     }
 }

@@ -223,19 +223,19 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "reference header does not match version")]
-    fn tsuki_version_rejects_v6_header() {
+    fn tsuki_v2_version_rejects_v6_header() {
         let _ = BatchInfo::from(&witness(TSUKI_V2, v6_header(TSUKI_V2)));
     }
 
     #[test]
     #[should_panic(expected = "reference header does not match version")]
-    fn tsuki_version_rejects_validium_header() {
+    fn tsuki_v2_version_rejects_validium_header() {
         let _ = BatchInfo::from(&witness(TSUKI_V2, validium_header(TSUKI_V2)));
     }
 
     #[test]
     #[should_panic(expected = "Unexpected ReferenceHeader::V8")]
-    fn tsuki_version_rejects_v8_header() {
+    fn tsuki_v2_version_rejects_v8_header() {
         let header = v7_header(TSUKI_V2).into_v8_feynman();
         let _ = BatchInfo::from(&witness(TSUKI_V2, header));
     }
@@ -256,7 +256,7 @@ mod tests {
     /// check shows the TsukiV2 version selected the V7 header and passed it to the V7 builder.
     #[test]
     #[should_panic(expected = "point_eval_witness missing for header::v7")]
-    fn tsuki_version_accepts_v7_header() {
+    fn tsuki_v2_version_accepts_v7_header() {
         let _ = BatchInfo::from(&witness(TSUKI_V2, v7_header(TSUKI_V2)));
     }
 
