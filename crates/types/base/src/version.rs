@@ -58,8 +58,11 @@ pub enum STFVersion {
     V9 = 9,
     /// Scroll@v10.
     V10 = 10,
-    /// DogeOS@v12 (TsukiV2). DogeOS's v11 (Tsuki) is not provable by these guests: its batches
+    /// DogeOS@v11 (Tsuki). Kept so hosts can name the codec of Tsuki batches; it has no
+    /// [`Version`] and no public-input definitions, so nothing is proven under it. Its batches
     /// carry the earlier public-input meaning (state-root endpoints, masked queue hash).
+    V11 = 11,
+    /// DogeOS@v12 (TsukiV2).
     V12 = 12,
 }
 
@@ -72,6 +75,7 @@ impl From<u8> for STFVersion {
             8 => Self::V8,
             9 => Self::V9,
             10 => Self::V10,
+            11 => Self::V11,
             12 => Self::V12,
             value => unreachable!("unsupported stf-version={value}"),
         }
@@ -247,7 +251,7 @@ mod tests {
     /// DogeOS's v11 (Tsuki) public inputs had state-root endpoints and a masked queue hash; the
     /// current definitions are TsukiV2's, so a v11 version byte must not select them.
     #[test]
-    #[should_panic(expected = "unsupported stf-version=11")]
+    #[should_panic(expected = "unsupported version=(Scroll, V11)")]
     fn version_byte_11_is_unsupported() {
         let _ = Version::from(11);
     }
