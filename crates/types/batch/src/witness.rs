@@ -183,7 +183,7 @@ mod tests {
         validium::{BatchHeaderValidium, BatchHeaderValidiumV1},
     };
 
-    const TSUKI: u8 = Version::tsuki().as_version_byte();
+    const TSUKI_V2: u8 = Version::tsuki_v2().as_version_byte();
     const EUCLID_V1: u8 = Version::euclid_v1().as_version_byte();
     const EUCLID_V2: u8 = Version::euclid_v2().as_version_byte();
     const FEYNMAN: u8 = Version::feynman().as_version_byte();
@@ -196,7 +196,7 @@ mod tests {
             blob_bytes: vec![],
             point_eval_witness: None,
             reference_header,
-            fork_name: ForkName::Tsuki,
+            fork_name: ForkName::TsukiV2,
         }
     }
 
@@ -224,26 +224,26 @@ mod tests {
     #[test]
     #[should_panic(expected = "reference header does not match version")]
     fn tsuki_version_rejects_v6_header() {
-        let _ = BatchInfo::from(&witness(TSUKI, v6_header(TSUKI)));
+        let _ = BatchInfo::from(&witness(TSUKI_V2, v6_header(TSUKI_V2)));
     }
 
     #[test]
     #[should_panic(expected = "reference header does not match version")]
     fn tsuki_version_rejects_validium_header() {
-        let _ = BatchInfo::from(&witness(TSUKI, validium_header(TSUKI)));
+        let _ = BatchInfo::from(&witness(TSUKI_V2, validium_header(TSUKI_V2)));
     }
 
     #[test]
     #[should_panic(expected = "Unexpected ReferenceHeader::V8")]
     fn tsuki_version_rejects_v8_header() {
-        let header = v7_header(TSUKI).into_v8_feynman();
-        let _ = BatchInfo::from(&witness(TSUKI, header));
+        let header = v7_header(TSUKI_V2).into_v8_feynman();
+        let _ = BatchInfo::from(&witness(TSUKI_V2, header));
     }
 
     #[test]
     #[should_panic(expected = "reference header does not match version")]
     fn validium_version_rejects_v7_header() {
-        let _ = BatchInfo::from(&witness(VALIDIUM_V1, v7_header(TSUKI)));
+        let _ = BatchInfo::from(&witness(VALIDIUM_V1, v7_header(TSUKI_V2)));
     }
 
     #[test]
@@ -253,11 +253,11 @@ mod tests {
     }
 
     /// The V7 arm is the only one that requires a point-evaluation witness, so reaching that
-    /// check shows the Tsuki version selected the V7 header and passed it to the V7 builder.
+    /// check shows the TsukiV2 version selected the V7 header and passed it to the V7 builder.
     #[test]
     #[should_panic(expected = "point_eval_witness missing for header::v7")]
     fn tsuki_version_accepts_v7_header() {
-        let _ = BatchInfo::from(&witness(TSUKI, v7_header(TSUKI)));
+        let _ = BatchInfo::from(&witness(TSUKI_V2, v7_header(TSUKI_V2)));
     }
 
     #[test]

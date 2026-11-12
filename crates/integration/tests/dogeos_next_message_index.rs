@@ -2,9 +2,9 @@
 //!
 //! DogeOS threads Scroll's `nextMessageIndex` out of the (patched)
 //! stateless-block-verifier into [`ChunkInfo`]/`BatchInfo`, committing it into the
-//! Tsuki / Scroll@v11 public inputs (see `dogeos/changes/next-message-index.md`).
-//! Tsuki is DogeOS's production fork; `ForkName::Tsuki` / `Version::tsuki()` are
-//! added by PR #9 (`feat/tsuki-hardfork`), which this branch stacks on.
+//! TsukiV2 / Scroll@v12 public inputs (see `dogeos/changes/next-message-index.md`).
+//! TsukiV2 is DogeOS's production fork; `ForkName::TsukiV2` / `Version::tsuki_v2()` are
+//! the names this fixture runs under.
 //!
 //! This test derives a [`ChunkInfo`] natively from committed DogeOS block witnesses —
 //! it runs the SBV state-transition, so it needs no guest program and no GPU — and
@@ -70,13 +70,13 @@ fn dogeos_next_message_index_committed_fixture() -> Result<()> {
         })?)
         .wrap_err("failed to parse DogeOS fixture manifest")?;
 
-    // Tsuki (Scroll@v11) is DogeOS's production fork that commits next_message_index into the PI.
+    // TsukiV2 (Scroll@v12) is DogeOS's production fork that commits next_message_index into the PI.
     eyre::ensure!(
         manifest.fork_name == "Tsuki",
         "unexpected fork_name {} (this fixture targets the Tsuki fork)",
         manifest.fork_name
     );
-    let version = Version::tsuki();
+    let version = Version::tsuki_v2();
     let prev_msg_queue_hash = parse_b256(&manifest.prev_msg_queue_hash)?;
 
     // Read the committed DogeOS block witnesses for the manifest's block range. A failure
@@ -99,15 +99,16 @@ fn dogeos_next_message_index_committed_fixture() -> Result<()> {
 
     // Assemble the chunk witness exactly as the tester harness does, then derive the
     // ChunkInfo natively (runs the SBV STF; no guest program / GPU involved).
-    // From Tsuki the chunk opens the header of the block before its first block. The fixture
+    // From TsukiV2 the chunk opens the header of the block before its first block. The fixture
     // carries it as the preceding block's witness, or as `witnesses/parent.json` when the range
     // starts at the chain's first block.
-    let parent_header = read_parent_header(&witnesses_dir, manifest.block_start, ForkName::Tsuki)?;
+    let parent_header =
+        read_parent_header(&witnesses_dir, manifest.block_start, ForkName::TsukiV2)?;
     let witness = ChunkWitness::new_scroll(
         version.as_version_byte(),
         &blocks,
         prev_msg_queue_hash,
-        ForkName::Tsuki,
+        ForkName::TsukiV2,
         parent_header,
     );
     let chunk_info = metadata_from_chunk_witnesses(witness)?;

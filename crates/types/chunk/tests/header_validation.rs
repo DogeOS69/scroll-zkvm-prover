@@ -1,7 +1,7 @@
 //! The proof path must reject headers that the execution client considers non-canonical,
 //! including metadata that cannot be detected by replaying transactions and checking state roots.
 //!
-//! From Tsuki the chunk opens the header of the block before its first block, so the header rules
+//! From TsukiV2 the chunk opens the header of the block before its first block, so the header rules
 //! run across that boundary too: a chunk cannot be grafted onto a chain it does not continue,
 //! even when its own blocks are internally consistent.
 //!
@@ -11,7 +11,7 @@
 
 mod common;
 
-use common::{TSUKI_VERSION_BYTE, base_fee_chunk};
+use common::{TSUKI_V2_VERSION_BYTE, base_fee_chunk};
 use sbv_primitives::{B256, U256, types::consensus::Header};
 use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
 use types_base::fork_name::ForkName;
@@ -19,10 +19,10 @@ use types_base::fork_name::ForkName;
 fn tsuki_witness() -> ChunkWitness {
     let (parent, blocks) = base_fee_chunk();
     ChunkWitness::new_scroll(
-        TSUKI_VERSION_BYTE,
+        TSUKI_V2_VERSION_BYTE,
         &blocks,
         B256::ZERO,
-        ForkName::Tsuki,
+        ForkName::TsukiV2,
         parent,
     )
 }
@@ -86,15 +86,15 @@ fn noncanonical_headers_are_rejected_before_execution() {
     }
 }
 
-/// A Tsuki chunk has to carry the header it is anchored to.
+/// A TsukiV2 chunk has to carry the header it is anchored to.
 #[test]
 fn a_tsuki_chunk_without_a_parent_header_is_rejected() {
     let mut witness = tsuki_witness();
     witness.parent_header = None;
 
     assert_eq!(
-        execute(witness).expect_err("a Tsuki chunk must carry its parent header"),
-        format!("missing parent header for a {} chunk", ForkName::Tsuki)
+        execute(witness).expect_err("a TsukiV2 chunk must carry its parent header"),
+        format!("missing parent header for a {} chunk", ForkName::TsukiV2)
     );
 }
 
@@ -140,10 +140,10 @@ fn headers_are_validated_against_their_parent() {
             ("mid-chunk", &blocks[1..=2], blocks[0].header.clone()),
         ] {
             let mut witness = ChunkWitness::new_scroll(
-                TSUKI_VERSION_BYTE,
+                TSUKI_V2_VERSION_BYTE,
                 chunk,
                 B256::ZERO,
-                ForkName::Tsuki,
+                ForkName::TsukiV2,
                 parent,
             );
             let offending = witness.blocks.len() - 1;

@@ -1,16 +1,16 @@
 //! A chunk's public inputs carry its boundary endpoints in the `prev_state_root` and
-//! `post_state_root` slots. From Tsuki those slots carry the boundary **L2 block hashes** instead
+//! `post_state_root` slots. From TsukiV2 those slots carry the boundary **L2 block hashes** instead
 //! of state roots: the chunk opens the header of the block before its first block, so the hash of
 //! that header is the previous endpoint and the hash of its own last block is the final one.
 //!
 //! The byte layout does not change, which is what keeps the batch and bundle circuits untouched
 //! and means nothing has to be migrated. What the published value *means* does change, and it
 //! propagates: the batch and the bundle take their own endpoints from the chunk's, so the value a
-//! bundle proof finalizes on-chain is a block hash from Tsuki.
+//! bundle proof finalizes on-chain is a block hash from TsukiV2.
 
 mod common;
 
-use common::{TSUKI_VERSION_BYTE, base_fee_chunk, feynman_blocks};
+use common::{TSUKI_V2_VERSION_BYTE, base_fee_chunk, feynman_blocks};
 use sbv_core::BlockWitness;
 use sbv_primitives::types::consensus::BlockHeader as _;
 use sbv_primitives::{B256, U256, types::Header};
@@ -22,22 +22,22 @@ use types_base::{
     version::Version,
 };
 
-/// The size of a Tsuki chunk's public inputs before the per-block contexts:
+/// The size of a TsukiV2 chunk's public inputs before the per-block contexts:
 /// version || chain id || prev endpoint || post endpoint || withdraw root || next message index ||
 /// tx data digest || prev msg queue hash || post msg queue hash || initial block number.
 const SIZE_TSUKI_PI_HEADER: usize = 1 + 8 + 32 + 32 + 32 + 8 + 32 + 32 + 32 + 8;
 
 fn tsuki_witness(parent: Header, blocks: &[BlockWitness]) -> ChunkWitness {
     ChunkWitness::new_scroll(
-        TSUKI_VERSION_BYTE,
+        TSUKI_V2_VERSION_BYTE,
         blocks,
         B256::ZERO,
-        ForkName::Tsuki,
+        ForkName::TsukiV2,
         parent,
     )
 }
 
-/// The Tsuki public-input layout is unchanged: 269 bytes for a one-block chunk, with the two
+/// The TsukiV2 public-input layout is unchanged: 269 bytes for a one-block chunk, with the two
 /// endpoints in the slots that held the state roots.
 #[test]
 fn the_tsuki_public_input_layout_is_unchanged() {
@@ -67,7 +67,7 @@ fn the_tsuki_public_input_layout_is_unchanged() {
         encryption_key: None,
     };
 
-    let pi = chunk_info.pi_tsuki(Version::tsuki());
+    let pi = chunk_info.pi_tsuki_v2(Version::tsuki_v2());
 
     assert_eq!(pi.len(), SIZE_TSUKI_PI_HEADER + SIZE_BLOCK_CTX);
     assert_eq!(pi.len(), 269);
@@ -75,7 +75,7 @@ fn the_tsuki_public_input_layout_is_unchanged() {
     assert_eq!(&pi[41..73], post.as_slice());
 }
 
-/// Endpoint semantics change at Tsuki; parent-header validation applies to every supported fork.
+/// Endpoint semantics change at TsukiV2; parent-header validation applies to every supported fork.
 #[test]
 fn only_tsuki_and_later_are_anchored() {
     for fork in [
@@ -87,7 +87,7 @@ fn only_tsuki_and_later_are_anchored() {
     ] {
         assert!(!fork_is_anchored(fork), "{fork} is not anchored");
     }
-    assert!(fork_is_anchored(ForkName::Tsuki));
+    assert!(fork_is_anchored(ForkName::TsukiV2));
 }
 
 /// Earlier forks keep state-root endpoints while also validating the supplied parent.
@@ -119,18 +119,18 @@ fn legacy_chunk_endpoints_remain_state_roots() {
     );
 }
 
-/// A Tsuki chunk's endpoints are the hash of the header it opens and the hash of its last block.
+/// A TsukiV2 chunk's endpoints are the hash of the header it opens and the hash of its last block.
 #[test]
 fn tsuki_chunk_endpoints_are_block_hashes() {
     let (parent, blocks) = base_fee_chunk();
     let last_hash = blocks.last().unwrap().header.hash_slow();
     let parent_hash = parent.hash_slow();
 
-    let chunk_info = execute(tsuki_witness(parent, &blocks)).expect("an honest Tsuki chunk");
+    let chunk_info = execute(tsuki_witness(parent, &blocks)).expect("an honest TsukiV2 chunk");
 
     assert_eq!(chunk_info.prev_state_root, parent_hash);
     assert_eq!(chunk_info.post_state_root, last_hash);
-    // The block-hash fields keep their values, so for Tsuki the two pairs agree.
+    // The block-hash fields keep their values, so for TsukiV2 the two pairs agree.
     assert_eq!(chunk_info.prev_blockhash, parent_hash);
     assert_eq!(chunk_info.post_blockhash, last_hash);
 }
@@ -190,7 +190,7 @@ fn a_pre_state_root_that_is_not_the_parents_is_rejected() {
 }
 
 /// Two chunks that really do follow each other satisfy the contract the batch circuit enforces:
-/// `ChunkInfo::validate` chains the endpoints and the rolling message queue hash. Under Tsuki the
+/// `ChunkInfo::validate` chains the endpoints and the rolling message queue hash. Under TsukiV2 the
 /// endpoint half of that is strictly stronger than it was, because a block hash commits to the
 /// state root and to everything else in the header.
 #[test]
@@ -202,10 +202,10 @@ fn a_chained_tsuki_pair_validates() {
     // The successor's rolling message queue hash is the one its predecessor ended on; block 3
     // carries an L1 message, so this is not zero and the pair would not chain without it.
     let second = ChunkWitness::new_scroll(
-        TSUKI_VERSION_BYTE,
+        TSUKI_V2_VERSION_BYTE,
         &blocks[4..],
         first.post_msg_queue_hash,
-        ForkName::Tsuki,
+        ForkName::TsukiV2,
         boundary.header.clone(),
     );
     let second = execute(second).expect("the second chunk");
@@ -215,13 +215,13 @@ fn a_chained_tsuki_pair_validates() {
         B256::ZERO,
         "block 3 enqueues one"
     );
-    second.validate(&first, Version::tsuki());
+    second.validate(&first, Version::tsuki_v2());
 }
 
 /// The two values a batch publishes as its own endpoints are the first chunk's previous endpoint
 /// and the last chunk's final one: `BatchInfoBuilderV7::build` copies them straight across
 /// (`crates/types/batch/src/builder/v7.rs`, `parent_state_root: first_chunk.prev_state_root` and
-/// `state_root: last_chunk.post_state_root`), and the bundle takes the batch's. So under Tsuki a
+/// `state_root: last_chunk.post_state_root`), and the bundle takes the batch's. So under TsukiV2 a
 /// batch - and the value a bundle proof finalizes on-chain - publishes block hashes.
 ///
 /// This pins the two values that get copied, over the two chunks a batch of this corpus would
@@ -235,10 +235,10 @@ fn the_endpoints_a_batch_would_publish_are_block_hashes() {
 
     let first = execute(tsuki_witness(genesis.clone(), &blocks[..4])).expect("the first chunk");
     let last = execute(ChunkWitness::new_scroll(
-        TSUKI_VERSION_BYTE,
+        TSUKI_V2_VERSION_BYTE,
         &blocks[4..],
         first.post_msg_queue_hash,
-        ForkName::Tsuki,
+        ForkName::TsukiV2,
         boundary.header.clone(),
     ))
     .expect("the last chunk");
@@ -301,10 +301,10 @@ fn the_witness_round_trips_through_bincode_and_json(#[case] has_parent: bool) {
         assert_eq!(
             execute(decoded)
                 .expect("the decoded chunk")
-                .pi_hash_by_version(Version::tsuki()),
+                .pi_hash_by_version(Version::tsuki_v2()),
             execute(witness)
                 .expect("the encoded chunk")
-                .pi_hash_by_version(Version::tsuki())
+                .pi_hash_by_version(Version::tsuki_v2())
         );
     } else {
         assert_eq!(

@@ -16,7 +16,7 @@
 
 mod common;
 
-use common::{TSUKI_VERSION_BYTE, base_fee_chunk};
+use common::{TSUKI_V2_VERSION_BYTE, base_fee_chunk};
 use sbv_core::BlockWitness;
 use sbv_primitives::{B256, types::consensus::Header};
 use scroll_zkvm_types_chunk::scroll::{ChunkWitness, execute};
@@ -24,10 +24,10 @@ use types_base::fork_name::ForkName;
 
 fn witness(parent: Header, blocks: &[BlockWitness]) -> ChunkWitness {
     ChunkWitness::new_scroll(
-        TSUKI_VERSION_BYTE,
+        TSUKI_V2_VERSION_BYTE,
         blocks,
         B256::ZERO,
-        ForkName::Tsuki,
+        ForkName::TsukiV2,
         parent,
     )
 }

@@ -9,7 +9,7 @@ use sbv_primitives::types::Header;
 use std::path::Path;
 use types_base::version::Version;
 
-pub const TSUKI_VERSION_BYTE: u8 = Version::tsuki().as_version_byte();
+pub const TSUKI_V2_VERSION_BYTE: u8 = Version::tsuki_v2().as_version_byte();
 
 /// Reads the native SBV witness format. Legacy corpora must be regenerated before replay.
 fn read_witness(path: &Path) -> BlockWitness {

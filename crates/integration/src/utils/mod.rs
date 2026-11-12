@@ -305,7 +305,7 @@ pub fn build_batch_witnesses(
         | ForkName::Feynman
         | ForkName::Galileo
         | ForkName::GalileoV2
-        | ForkName::Tsuki => {
+        | ForkName::TsukiV2 => {
             use scroll_zkvm_types::scroll::batch::BatchHeaderV7;
             ReferenceHeader::V7_V8_V9_V10(BatchHeaderV7 {
                 version: last_header.version,
@@ -431,7 +431,7 @@ fn test_build_and_parse_batch_task() -> eyre::Result<()> {
         ForkName::Galileo => (Version::galileo(), 20239156u64..=20239192),
         ForkName::GalileoV2 => (Version::galileo_v2(), 20239240u64..=20239245),
         // The whole `tsuki-base-fee` corpus as one chunk.
-        ForkName::Tsuki => (Version::tsuki(), 1..=7),
+        ForkName::TsukiV2 => (Version::tsuki_v2(), 1..=7),
     };
     let witness = ChunkTaskGenerator {
         version,

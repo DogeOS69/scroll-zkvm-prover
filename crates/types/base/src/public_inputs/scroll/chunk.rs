@@ -64,7 +64,7 @@ pub struct ChunkInfo {
     pub chain_id: u64,
     /// The chunk's previous endpoint.
     ///
-    /// From Tsuki this is the **L2 block hash** of the block before the chunk's first block,
+    /// From TsukiV2 this is the **L2 block hash** of the block before the chunk's first block,
     /// which is the header the chunk opens. The field name is kept so that the public-input byte
     /// layout and the serde keys are unchanged and nothing has to be migrated; the *meaning* of
     /// the published value does change, and it propagates - the batch and the bundle take their
@@ -73,7 +73,7 @@ pub struct ChunkInfo {
     pub prev_state_root: B256,
     /// The chunk's final endpoint.
     ///
-    /// From Tsuki this is the **L2 block hash** of the chunk's last block, for the same reason as
+    /// From TsukiV2 this is the **L2 block hash** of the chunk's last block, for the same reason as
     /// [`Self::prev_state_root`]. Earlier forks carry the state root after the chunk.
     pub post_state_root: B256,
     /// The withdrawals root after applying the chunk.
@@ -251,7 +251,7 @@ impl ChunkInfo {
         self.pi_galileo(version)
     }
 
-    /// Public inputs encoded for a given chunk for Scroll@v11 (Tsuki) is defined as
+    /// Public inputs encoded for a given chunk for Scroll@v12 (TsukiV2) is defined as
     ///
     /// concat(
     ///     version ||
@@ -266,7 +266,7 @@ impl ChunkInfo {
     ///     initial block number ||
     ///     block_ctx for block_ctx in block_ctxs
     /// )
-    pub fn pi_tsuki(&self, version: Version) -> Vec<u8> {
+    pub fn pi_tsuki_v2(&self, version: Version) -> Vec<u8> {
         std::iter::empty()
             .chain(&[version.as_version_byte()])
             .chain(&self.chain_id.to_be_bytes())
@@ -347,7 +347,7 @@ impl MultiVersionPublicInputs for ChunkInfo {
             (Domain::Scroll, STFVersion::V8) => self.pi_feynman(),
             (Domain::Scroll, STFVersion::V9) => self.pi_galileo(version),
             (Domain::Scroll, STFVersion::V10) => self.pi_galileo_v2(version),
-            (Domain::Scroll, STFVersion::V11) => self.pi_tsuki(version),
+            (Domain::Scroll, STFVersion::V12) => self.pi_tsuki_v2(version),
             (Domain::Validium, STFVersion::V1) => self.pi_validium(version),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
@@ -358,20 +358,20 @@ impl MultiVersionPublicInputs for ChunkInfo {
     /// Validate public inputs between 2 contiguous chunks.
     ///
     /// - chain id MUST match
-    /// - the boundary endpoints MUST be chained: state roots before Tsuki, and from Tsuki the
+    /// - the boundary endpoints MUST be chained: state roots before TsukiV2, and from TsukiV2 the
     ///   block hashes those slots then carry, which is strictly stronger - a block hash commits
     ///   to the state root and to every other header field
     /// - L1 msg queue hash MUST be chained
     ///
-    /// Furthermore, for validiums we must also chain the blockhashes; from Tsuki the endpoint
+    /// Furthermore, for validiums we must also chain the blockhashes; from TsukiV2 the endpoint
     /// check above already does that for the Scroll domain.
     fn validate(&self, prev_pi: &Self, version: Version) {
         assert_eq!(self.chain_id, prev_pi.chain_id);
         assert_eq!(self.prev_state_root, prev_pi.post_state_root);
         assert_eq!(self.prev_msg_queue_hash, prev_pi.post_msg_queue_hash);
 
-        // Scroll@v11 commits next_message_index into the chunk PI, so it must not regress.
-        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V11) {
+        // Scroll@v12 commits next_message_index into the chunk PI, so it must not regress.
+        if version.domain == Domain::Scroll && matches!(version.stf_version, STFVersion::V12) {
             assert!(
                 self.next_message_index >= prev_pi.next_message_index,
                 "next_message_index must not regress"
@@ -476,17 +476,17 @@ mod tests {
 
     #[test]
     fn tsuki_chunk_pi_layout_commits_next_message_index() {
-        let pi = sample_chunk_info(0x0102_0304_0506_0708).pi_tsuki(Version::tsuki());
+        let pi = sample_chunk_info(0x0102_0304_0506_0708).pi_tsuki_v2(Version::tsuki_v2());
 
         assert_eq!(pi.len(), 269);
-        assert_eq!(pi[0], Version::tsuki().as_version_byte());
+        assert_eq!(pi[0], Version::tsuki_v2().as_version_byte());
         assert_eq!(&pi[105..113], &0x0102_0304_0506_0708u64.to_be_bytes());
         assert_eq!(&pi[113..145], B256::repeat_byte(0x55).as_slice());
     }
 
     #[test]
     fn tsuki_chunk_validate_reports_regression() {
-        let version = Version::tsuki();
+        let version = Version::tsuki_v2();
         let prev = sample_chunk_info(22);
         let current = next_contiguous_chunk(&prev, 21);
 

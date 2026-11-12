@@ -18,7 +18,7 @@ pub struct BundleInfo {
     pub num_batches: u32,
     /// The last finalized on-chain endpoint.
     ///
-    /// From Tsuki this is an **L2 block hash** rather than a state root: it is the first batch's
+    /// From TsukiV2 this is an **L2 block hash** rather than a state root: it is the first batch's
     /// previous endpoint, which comes from its first chunk's. The field name and the byte layout
     /// are unchanged.
     pub prev_state_root: B256,
@@ -27,7 +27,7 @@ pub struct BundleInfo {
     /// The bundle's final endpoint, after applying every batch in it.
     ///
     /// Upon verification of the EVM-verifiable bundle proof, this value is finalized on-chain.
-    /// From Tsuki it is the **L2 block hash** of the bundle's last block rather than a state root,
+    /// From TsukiV2 it is the **L2 block hash** of the bundle's last block rather than a state root,
     /// so what is finalized commits to the whole header; the field name and the byte layout are
     /// unchanged.
     pub post_state_root: B256,
@@ -106,7 +106,7 @@ impl BundleInfo {
         self.pi_euclidv2()
     }
 
-    pub fn pi_tsuki(&self) -> Vec<u8> {
+    pub fn pi_tsuki_v2(&self) -> Vec<u8> {
         self.pi_galileo_v2()
     }
 
@@ -138,7 +138,7 @@ impl MultiVersionPublicInputs for BundleInfo {
             (Domain::Scroll, STFVersion::V8) => self.pi_versioned(version, self.pi_feynman()),
             (Domain::Scroll, STFVersion::V9) => self.pi_versioned(version, self.pi_galileo()),
             (Domain::Scroll, STFVersion::V10) => self.pi_versioned(version, self.pi_galileo_v2()),
-            (Domain::Scroll, STFVersion::V11) => self.pi_versioned(version, self.pi_tsuki()),
+            (Domain::Scroll, STFVersion::V12) => self.pi_versioned(version, self.pi_tsuki_v2()),
             (Domain::Validium, STFVersion::V1) => self.pi_versioned(version, self.pi_validium_v1()),
             (domain, stf_version) => {
                 unreachable!("unsupported version=({domain:?}, {stf_version:?})")
@@ -173,11 +173,11 @@ mod tests {
 
     #[test]
     fn tsuki_bundle_pi_uses_versioned_galileov2_layout() {
-        let pi = sample_bundle_info().pi_by_version(Version::tsuki());
+        let pi = sample_bundle_info().pi_by_version(Version::tsuki_v2());
 
         assert_eq!(pi.len(), 236);
         assert_eq!(&pi[..31], &[0u8; 31]);
-        assert_eq!(pi[31], Version::tsuki().as_version_byte());
+        assert_eq!(pi[31], Version::tsuki_v2().as_version_byte());
         assert_eq!(&pi[32..40], &534352u64.to_be_bytes());
         assert_eq!(&pi[40..72], B256::repeat_byte(0x11).as_slice());
     }

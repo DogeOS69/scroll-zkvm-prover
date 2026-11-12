@@ -85,7 +85,7 @@ mod tests {
         builder::{BatchInfoBuilder, BuilderArgsV6},
     };
 
-    const TSUKI: u8 = Version::tsuki().as_version_byte();
+    const TSUKI_V2: u8 = Version::tsuki_v2().as_version_byte();
     const EUCLID_V1: u8 = Version::euclid_v1().as_version_byte();
 
     fn args(header_version: u8) -> BuilderArgsV6 {
@@ -103,12 +103,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "codec mismatch: expected V6")]
     fn rejects_tsuki_version() {
-        let _ = BatchInfoBuilderV6::build(TSUKI, args(TSUKI));
+        let _ = BatchInfoBuilderV6::build(TSUKI_V2, args(TSUKI_V2));
     }
 
     #[test]
     #[should_panic(expected = "batch header version mismatch")]
     fn rejects_header_version_mismatch() {
-        let _ = BatchInfoBuilderV6::build(EUCLID_V1, args(TSUKI));
+        let _ = BatchInfoBuilderV6::build(EUCLID_V1, args(TSUKI_V2));
     }
 }
