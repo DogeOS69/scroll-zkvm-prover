@@ -1,7 +1,8 @@
 # Tsuki integration witnesses
 
-> Historical corpus: it was collected and described under Tsuki / codec v11.
-> The integration suite now runs it as TsukiV2 / v12 (version byte 12).
+> Historical corpus, collected and described under Tsuki / codec v11. The
+> TsukiV2 / v12 presets read `../tsuki-base-fee` instead; this corpus is kept for
+> the edge-fixture contract test.
 
 This directory contains a continuous, genuine `BlockWitness` lineage from a local
 DogeOS ScrollReth node running Tsuki from genesis. The integration suite combines
