@@ -34,6 +34,22 @@ truth and keeping DogeOS work as a thin overlay.
 - Before the SBV commit is pushed, use temporary CLI `cargo --config` path
   overrides for local verification instead of checking in `.cargo/config.toml`.
 
+## Tsuki v0.14 dependency pin
+
+All five SBV crates use immutable commit
+`9586e6a8195c6799af5f9aa7d8f3d37de6921d4b`. It selects dogeos-reth
+`b95b7b0c58a2c4fecc25d09ee9412369f52361c8` (PR #59) and Reth tag
+`tsuki-v0.14` (`005acc083ccad7c6d76b28e2da8cbe7593cc3a14`). DogeOS REVM
+remains on `tsuki-v0.13`; OpenVM remains on `v1.7.0`.
+
+Run `make test-chunk-witness-checks` before rebuilding guest assets. This
+repin retains main's codec V12 semantics and adds no checkpoint configuration.
+Guest executable commitments require canonical `make build-guest` verification
+before deployment. For CI artifacts, verify `guest-build-source.txt` against
+the tested source commit and `guest-build-inputs.sha256` against the checked-out
+inputs before applying `guest-build.diff`. Native replay and guest VM execution
+do not establish proof generation or verification.
+
 ## Testdata policy
 
 - Put DogeOS-only integration assets under
