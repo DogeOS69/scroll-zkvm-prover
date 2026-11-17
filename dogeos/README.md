@@ -36,8 +36,8 @@ truth and keeping DogeOS work as a thin overlay.
 
 ## Tsuki v0.14 dependency pin
 
-All five SBV crates use immutable commit
-`1f9a00eda1716259f367d55c6ab33a6182c94639`. It selects dogeos-reth tag `tsuki-v0.14`
+All five SBV crates use tag `tsuki-v0.14`, locked to merged SBV PR #36 commit
+`9692cb52edc4f1c74e1762b3eaada4fea1f78ca7`. It selects dogeos-reth tag `tsuki-v0.14`
 (`4788802d646dd177577f95d276122e0029ae5d23`, merged PR #59) and Reth tag
 `tsuki-v0.14` (`005acc083ccad7c6d76b28e2da8cbe7593cc3a14`). DogeOS REVM
 remains on `tsuki-v0.13`; OpenVM remains on `v1.7.0`.
